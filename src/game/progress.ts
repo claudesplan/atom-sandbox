@@ -9,9 +9,37 @@ export interface ChallengeResult {
   at: number;
 }
 
+export interface PracticeStats {
+  solved: { easy: number; medium: number; hard: number };
+  points: number;
+  streak: number;
+  bestStreak: number;
+}
+
 export interface Progress {
   version: 1;
   results: Record<string, ChallengeResult>;
+  /** randomly generated practice challenges (added later; may be missing in old saves) */
+  practice?: PracticeStats;
+}
+
+export function emptyPractice(): PracticeStats {
+  return { solved: { easy: 0, medium: 0, hard: 0 }, points: 0, streak: 0, bestStreak: 0 };
+}
+
+export function practiceStats(p: Progress): PracticeStats {
+  const d = emptyPractice();
+  const s = p.practice;
+  if (!s) return d;
+  return { solved: { ...d.solved, ...(s.solved ?? {}) }, points: s.points ?? 0, streak: s.streak ?? 0, bestStreak: s.bestStreak ?? 0 };
+}
+
+/** Record a practice result: solved (with points) or revealed (breaks the streak). */
+export function recordPractice(p: Progress, difficulty: 'easy' | 'medium' | 'hard', points: number, revealed: boolean): Progress {
+  const s = practiceStats(p);
+  if (revealed) return { ...p, practice: { ...s, streak: 0 } };
+  const streak = s.streak + 1;
+  return { ...p, practice: { solved: { ...s.solved, [difficulty]: s.solved[difficulty] + 1 }, points: s.points + points, streak, bestStreak: Math.max(s.bestStreak, streak) } };
 }
 
 export const PROGRESS_KEY = 'atom-sandbox.progress.v1';

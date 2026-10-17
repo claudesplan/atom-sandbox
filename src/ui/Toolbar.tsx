@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { CHALLENGES } from '../game/challenges';
 import { totals } from '../game/progress';
 import { useStore, type Mode, type ViewOptions } from '../state/store';
@@ -20,6 +21,7 @@ export function Toolbar() {
         <div className="seg">
           <ModeButton m="atom" label="Atom builder" k="1" icon={<Icon.atom />} />
           <ModeButton m="reaction" label="Reactions" k="2" icon={<Icon.reaction />} />
+          <ModeButton m="bonds" label="Bonds" k="3" icon={<Icon.bond />} />
         </div>
       </div>
       <div className="tb-sep" />
@@ -35,11 +37,16 @@ export function Toolbar() {
       <div className="tb-group toggles">
         <Toggle k="labels" label="Labels" title="Shell, particle and count labels" />
         <Toggle k="animate" label="Motion" title="Animate electrons, nucleus jiggle and flying particles" />
-        {mode === 'atom' ? (
+        {mode === 'atom' && (
           <Toggle k="cloud" label="Cloud ≈" title="Show an impression of the electron cloud instead of Bohr rings. Real electrons are spread out in orbitals, not on circular orbits — both pictures are simplified." />
-        ) : (
-          <Toggle k="formulas" label="Formulas" title="Coefficient and formula under each group of molecules" />
         )}
+        {mode === 'reaction' && (
+          <>
+            <Toggle k="formulas" label="Formulas" title="Coefficient and formula under each group of molecules" />
+            <Toggle k="bondTypes" label="Bond types" title="Colour bonds by type (non-polar / polar covalent / ionic) and show δ+ / δ− partial charges" />
+          </>
+        )}
+        {mode === 'bonds' && <Toggle k="enColours" label="EN colours" title="Colour the periodic table by electronegativity (how strongly an atom pulls shared electrons)" />}
       </div>
       <div className="tb-spacer" />
       <div className="tb-group">
@@ -57,7 +64,7 @@ export function Toolbar() {
   );
 }
 
-function ModeButton({ m, label, k, icon }: { m: Mode; label: string; k: string; icon: React.ReactNode }) {
+function ModeButton({ m, label, k, icon }: { m: Mode; label: string; k: string; icon: ReactNode }) {
   const mode = useStore((s) => s.mode);
   return (
     <button className={`seg-btn${mode === m ? ' on' : ''}`} title={`${label} (${k})`} onClick={() => useStore.getState().setMode(m)}>

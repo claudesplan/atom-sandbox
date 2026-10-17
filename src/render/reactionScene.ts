@@ -1,3 +1,4 @@
+import { classifyBond } from '../chem/bonding';
 import { checkBalance, type Equation } from '../chem/equation';
 import { prettyFormula } from '../chem/formula';
 import { structureFor, type Structure } from '../chem/structures';
@@ -179,7 +180,7 @@ function chargeLabel(ctx: CanvasRenderingContext2D, q: number, x: number, y: num
   ctx.fillText(txt, x, y);
 }
 
-function drawStructure(ctx: CanvasRenderingContext2D, st: Structure, ox: number, oy: number, s: number, alpha = 1) {
+function drawStructure(ctx: CanvasRenderingContext2D, st: Structure, ox: number, oy: number, s: number, alpha = 1, bondTypes = false) {
   if (st.kind === 'electron') {
     ctx.fillStyle = withAlpha(C.electron, 0.2 * alpha);
     ctx.beginPath();
@@ -202,7 +203,9 @@ function drawStructure(ctx: CanvasRenderingContext2D, st: Structure, ox: number,
     const len = Math.hypot(x2 - x1, y2 - y1) || 1;
     const nx = -(y2 - y1) / len;
     const ny = (x2 - x1) / len;
-    ctx.strokeStyle = b.ionic ? withAlpha('#c9a0ff', 0.55 * alpha) : withAlpha('#c9d1d9', 0.85 * alpha);
+    const cls = bondTypes && !b.ionic ? classifyBond(a1.el, a2.el) : null;
+    const polar = cls != null && cls.type !== 'nonpolar-covalent';
+    ctx.strokeStyle = b.ionic ? withAlpha('#c9a0ff', (bondTypes ? 0.9 : 0.55) * alpha) : polar ? withAlpha('#f0a33a', 0.95 * alpha) : withAlpha('#c9d1d9', 0.85 * alpha);
     ctx.lineWidth = Math.max(1.2, s * 0.06);
     ctx.setLineDash(b.ionic ? [3, 3] : []);
     const gap = Math.max(2.5, s * 0.1);
@@ -216,6 +219,30 @@ function drawStructure(ctx: CanvasRenderingContext2D, st: Structure, ox: number,
   }
   ctx.setLineDash([]);
   for (const a of st.atoms) drawAtom(ctx, a.el, ox + a.x * s, oy + a.y * s, s, alpha, a.charge);
+  if (bondTypes) {
+    // partial charges: net direction of the polar bonds each atom takes part in
+    const net = st.atoms.map(() => 0);
+    for (const b of st.bonds) {
+      if (b.ionic) continue;
+      const x = st.atoms[b.a].el;
+      const y = st.atoms[b.b].el;
+      const c = classifyBond(x, y);
+      if (c.type === 'nonpolar-covalent' || !c.negative) continue;
+      const negIdx = c.negative === x ? b.a : b.b;
+      const posIdx = negIdx === b.a ? b.b : b.a;
+      net[negIdx] -= 1;
+      net[posIdx] += 1;
+    }
+    st.atoms.forEach((a, i) => {
+      if (!net[i] || a.charge) return;
+      const r = atomRadius(a.el) * s;
+      ctx.font = `600 ${Math.max(9, Math.min(13, s * 0.3))}px ui-sans-serif, system-ui`;
+      ctx.fillStyle = withAlpha(net[i] < 0 ? '#8cc8ff' : '#ff8a8a', alpha);
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(net[i] < 0 ? 'δ−' : 'δ+', ox + a.x * s - r * 0.7, oy + a.y * s - r * 0.95);
+    });
+  }
   for (const g of st.groups) {
     const xs = g.atoms.map((i) => st.atoms[i]);
     const r = Math.max(...xs.map((a) => atomRadius(a.el)));
@@ -385,7 +412,7 @@ export function drawReactionScene(
         ctx.fillRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8);
         ctx.strokeRect(r.x - 3.5, r.y - 3.5, r.w + 7, r.h + 7);
       }
-      for (const c of t.copies) drawStructure(ctx, t.structure, c.x, c.y, s);
+      for (const c of t.copies) drawStructure(ctx, t.structure, c.x, c.y, s, 1, view.bondTypes);
     }
     // label: coefficient + formula
     const sp = eq.terms[t.term].species;
@@ -423,6 +450,7 @@ export function drawReactionScene(
   if (kinds.has('ionic')) notes.push('Ionic solids are drawn as one formula unit (really a giant lattice) ≈');
   if (kinds.has('metal')) notes.push('Metals are drawn as single atoms ≈');
   if (kinds.has('unknown')) notes.push('Unknown structures are drawn as loose groups of atoms');
+  if (view.bondTypes) notes.push('Bonds: grey non-polar · orange polar covalent · dotted purple ionic');
   ctx.fillStyle = C.faint;
   ctx.font = '10.5px ui-sans-serif, system-ui';
   ctx.textAlign = 'left';

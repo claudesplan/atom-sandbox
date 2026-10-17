@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { describeAtom } from '../chem/atom';
 import { checkBalance } from '../chem/equation';
-import { CHALLENGES } from '../game/challenges';
-import { totals } from '../game/progress';
+import { challengeById, CHALLENGES } from '../game/challenges';
+import { practiceStats, totals } from '../game/progress';
 import { parsedEquation, useStore, type Tool } from '../state/store';
 import { addParticle, removeParticle } from './actions';
 import { BottomPanel } from './BottomPanel';
@@ -31,6 +31,9 @@ function useKeyboard() {
       }
       if (k === '1') st.setMode('atom');
       else if (k === '2') st.setMode('reaction');
+      else if (k === '3') st.setMode('bonds');
+      else if (k === 'g') st.startPractice();
+      else if (st.mode === 'bonds' && k === 'a') useStore.setState({ animateBond: st.animateBond + 1 });
       else if (k === '?') useStore.setState({ dialog: 'help' });
       else if (k === 'h') st.showHint();
       else if (st.mode === 'atom' && (k === 'p' || k === 'n' || k === 'e')) {
@@ -57,12 +60,14 @@ function StatusBar() {
   const tool = useStore((s) => s.tool);
   const progress = useStore((s) => s.progress);
   const active = useStore((s) => s.activeChallenge);
+  const pair = useStore((s) => s.doc.pair);
   const tot = totals(progress);
+  const prac = practiceStats(progress);
   const d = describeAtom(atom);
   const p = parsedEquation(text);
   return (
     <div className="statusbar">
-      <span>mode: {mode === 'atom' ? 'atom builder' : 'reactions'}</span>
+      <span>mode: {mode === 'atom' ? 'atom builder' : mode === 'bonds' ? 'bonds' : 'reactions'}</span>
       {mode === 'atom' ? (
         <>
           <span>tool: {tool}</span>
@@ -70,13 +75,17 @@ function StatusBar() {
             {d.element ? `${d.element.symbol} Z=${d.Z} A=${d.A} q=${d.charge}` : 'no element'} · {atom.protons + atom.neutrons + atom.electrons} particles
           </span>
         </>
+      ) : mode === 'bonds' ? (
+        <span>
+          pair {pair[0]} + {pair[1]}
+        </span>
       ) : (
         <span>{p.ok ? `${p.eq.terms.length} species · ${checkBalance(p.eq, coefs).balanced ? 'balanced' : 'not balanced'}` : 'equation error'}</span>
       )}
-      <span>{active ? `challenge: ${CHALLENGES.find((c) => c.id === active)?.title}` : 'free play'}</span>
+      <span>{active ? `challenge: ${challengeById(active)?.title}` : 'free play'}</span>
       <span className="tb-spacer" />
       <span>
-        progress {tot.solved}/{CHALLENGES.length} · {tot.points} pts (saved in this browser)
+        levels {tot.solved}/{CHALLENGES.length} · {tot.points} pts · practice {prac.solved.easy + prac.solved.medium + prac.solved.hard} solved, {prac.points} pts, streak {prac.streak} (saved in this browser)
       </span>
     </div>
   );

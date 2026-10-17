@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { describeAtom, referenceAtom } from '../chem/atom';
+import { electronegativity } from '../chem/bonding';
 import { CATEGORY_LABEL, ELEMENTS, elementBySymbol, elementByZ, type Category, type Element } from '../chem/elements';
 import { checkBalance, equationToText } from '../chem/equation';
 import { classifyNucleus, type DecayMode } from '../chem/nuclides';
 import { CATEGORY_COLOR, C, atomColor } from '../render/colors';
-import { challengeById, CHALLENGES, criteriaFor } from '../game/challenges';
+import { challengeById, CHALLENGES, criteriaFor, generatedInfo } from '../game/challenges';
+import { DIFFICULTY_LABEL, DIFFICULTY_POINTS } from '../game/generator';
+import { BOND_LABEL, classifyBond, pairCompound } from '../chem/bonding';
 import { parsedEquation, useStore } from '../state/store';
 import { animateReaction } from './LeftPanel';
 
@@ -13,15 +16,22 @@ export function BottomPanel() {
   return (
     <div className="bottom">
       <SummaryStrip />
-      {mode === 'atom' ? (
+      {mode === 'atom' && (
         <div className="bottom-body atom">
           <PeriodicTable />
           <NuclideChart />
           <ChallengePanel />
         </div>
-      ) : (
+      )}
+      {mode === 'reaction' && (
         <div className="bottom-body reaction">
           <AtomInventory />
+          <ChallengePanel />
+        </div>
+      )}
+      {mode === 'bonds' && (
+        <div className="bottom-body reaction">
+          <PeriodicTable />
           <ChallengePanel />
         </div>
       )}
@@ -34,6 +44,7 @@ function SummaryStrip() {
   const atom = useStore((s) => s.doc.atom);
   const text = useStore((s) => s.doc.eqText);
   const coefs = useStore((s) => s.doc.coefs);
+  if (mode === 'bonds') return <BondStrip />;
   if (mode === 'atom') {
     const d = describeAtom(atom);
     return (
@@ -68,13 +79,33 @@ function SummaryStrip() {
 
 // ---------- periodic table ----------
 
+/** Blue (low) → red (high) electronegativity colour. */
+function enColour(x: number | null): string {
+  if (x == null) return '#2a3038';
+  const u = Math.max(0, Math.min(1, (x - 0.7) / (4.0 - 0.7)));
+  const r = Math.round(40 + 170 * u);
+  const g = Math.round(70 + 40 * Math.sin(Math.PI * u));
+  const b = Math.round(160 - 120 * u);
+  return `rgb(${r},${g},${b})`;
+}
+
 function PeriodicTable() {
-  const Z = useStore((s) => s.doc.atom.protons);
+  const mode = useStore((s) => s.mode);
+  const Zatom = useStore((s) => s.doc.atom.protons);
+  const pair = useStore((s) => s.doc.pair);
+  const slot = useStore((s) => s.pickSlot);
+  const enColours = useStore((s) => s.view.enColours);
+  const bonds = mode === 'bonds';
+  const Z = bonds ? elementBySymbol(pair[slot])!.Z : Zatom;
   const [hover, setHover] = useState<Element | null>(null);
   const shown = hover ?? elementByZ(Z);
-  const pick = (el: Element) => {
+  const pick = (el: Element, slotOverride?: 0 | 1) => {
     const st = useStore.getState();
-    st.setAtom(() => referenceAtom(el.Z));
+    if (bonds) {
+      const k = slotOverride ?? st.pickSlot;
+      st.setPair(k, el.symbol);
+      if (slotOverride == null) useStore.setState({ pickSlot: k === 0 ? 1 : 0 });
+    } else st.setAtom(() => referenceAtom(el.Z));
   };
   return (
     <div className="ptable-wrap">
@@ -82,12 +113,23 @@ function PeriodicTable() {
         {ELEMENTS.map((el) => (
           <button
             key={el.Z}
-            className={`pcell${el.Z === Z ? ' current' : ''}${el.predicted ? ' predicted' : ''}`}
-            style={{ gridColumn: el.col, gridRow: el.row, background: CATEGORY_COLOR[el.category] }}
+            className={`pcell${(bonds ? pair.includes(el.symbol) : el.Z === Z) ? ' current' : ''}${el.predicted ? ' predicted' : ''}`}
+            style={{ gridColumn: el.col, gridRow: el.row, background: bonds && enColours ? enColour(electronegativity(el.symbol)) : CATEGORY_COLOR[el.category] }}
             onMouseEnter={() => setHover(el)}
             onClick={() => pick(el)}
-            title={`${el.Z} ${el.name} — click to build a neutral ${el.name.toLowerCase()}-${el.refA} atom`}
+            onContextMenu={(e) => {
+              if (!bonds) return;
+              e.preventDefault();
+              pick(el, 1);
+            }}
+            title={
+              bonds
+                ? `${el.Z} ${el.name} · electronegativity ${electronegativity(el.symbol)?.toFixed(2) ?? '—'} — click: set ${slot === 0 ? 'A' : 'B'}, right-click: set B`
+                : `${el.Z} ${el.name} — click to build a neutral ${el.name.toLowerCase()}-${el.refA} atom`
+            }
           >
+            {bonds && pair[0] === el.symbol && <span className="pab">A</span>}
+            {bonds && pair[1] === el.symbol && <span className="pab b">B</span>}
             <span className="pz">{el.Z}</span>
             <span className="ps">{el.symbol}</span>
           </button>
@@ -111,9 +153,26 @@ function PeriodicTable() {
                   <span className="dim">
                     {CATEGORY_LABEL[shown.category]}
                     {shown.predicted ? ' (predicted)' : ''} · {shown.weightIsMassNumber ? `[${shown.weight}]` : `${shown.weight} u`}
+                    {bonds && ` · EN ${electronegativity(shown.symbol)?.toFixed(2) ?? '—'}`}
                   </span>
                 </span>
               </div>
+              {bonds && enColours ? (
+                <div className="legend">
+                  <span className="lg">
+                    <i style={{ background: enColour(0.8) }} />
+                    low electronegativity (gives electrons away)
+                  </span>
+                  <span className="lg">
+                    <i style={{ background: enColour(4) }} />
+                    high (pulls electrons in)
+                  </span>
+                  <span className="lg">
+                    <i style={{ background: enColour(null) }} />
+                    no value
+                  </span>
+                </div>
+              ) : (
               <div className="legend">
                 {(Object.keys(CATEGORY_COLOR) as Category[]).map((c) => (
                   <span key={c} className={`lg${shown.category === c ? ' on' : ''}`}>
@@ -122,6 +181,7 @@ function PeriodicTable() {
                   </span>
                 ))}
               </div>
+              )}
             </>
           ) : (
             <span className="dim">Click an element to build its atom</span>
@@ -362,7 +422,11 @@ function ChallengePanel() {
   const text = useStore((s) => s.doc.eqText);
   const coefs = useStore((s) => s.doc.coefs);
   const progress = useStore((s) => s.progress);
+  const quizChoice = useStore((s) => s.quizChoice);
+  const wrong = useStore((s) => s.wrongAnswers);
+  const practice = useStore((s) => s.practice);
   const ch = challengeById(id);
+  const gen = generatedInfo(id);
   const st = useStore.getState();
   const nextUnsolved = () => {
     const idx = CHALLENGES.findIndex((c) => c.id === id);
@@ -374,23 +438,37 @@ function ChallengePanel() {
     return (
       <div className="challenge">
         <div className="panel-title">Challenge</div>
-        <div className="hint">Free play. Pick a challenge on the left, or jump to the next unsolved one.</div>
-        {next && (
-          <button className="tbtn" onClick={() => st.startChallenge(next.id)}>
-            Next challenge: {next.title} →
+        <div className="hint">Free play. Pick a challenge on the left, try a random practice one, or jump to the next unsolved level.</div>
+        <div className="btnrow">
+          {next && (
+            <button className="tbtn" onClick={() => st.startChallenge(next.id)}>
+              Next challenge: {next.title} →
+            </button>
+          )}
+          <button className="tbtn" onClick={() => st.startPractice()} title="Uses the difficulty and type chosen in the Practice section (G)">
+            🎲 Random ({DIFFICULTY_LABEL[practice.difficulty].toLowerCase()})
           </button>
-        )}
-        {!next && <div className="hint ok">You have solved every challenge. Well done!</div>}
+        </div>
+        {!next && <div className="hint ok">You have solved every level. Well done!</div>}
       </div>
     );
   }
   const p = parsedEquation(text);
-  const crit = criteriaFor(ch, atom, p.ok ? p.eq : null, coefs);
-  const next = nextUnsolved();
+  const crit = criteriaFor(ch, atom, p.ok ? p.eq : null, coefs, quizChoice);
+  const next = gen ? null : nextUnsolved();
+  const penalty = gen ? Math.round(DIFFICULTY_POINTS[gen.difficulty] / 4) : 25;
   return (
     <div className="challenge">
       <div className="panel-title">
-        Level {ch.level} · {ch.title}
+        {gen ? (
+          <>
+            <span className={`diff ${gen.difficulty}`}>{DIFFICULTY_LABEL[gen.difficulty]}</span> Practice · code {ch.id.replace('rnd-', '')}
+          </>
+        ) : (
+          <>
+            Level {ch.level} · {ch.title}
+          </>
+        )}
         <span className="ev-filters">
           <button className="toggle small" onClick={() => st.restartChallenge()} title="Start this challenge again">
             Restart
@@ -401,13 +479,27 @@ function ChallengePanel() {
         </span>
       </div>
       <div className="goal">{ch.goal}</div>
-      <ul className="crit">
-        {crit.map((c, i) => (
-          <li key={i} className={c.pass ? 'ok' : ''}>
-            {c.pass ? '✔' : '○'} {c.label}
-          </li>
-        ))}
-      </ul>
+      {ch.kind === 'quiz' ? (
+        <div className="quiz">
+          {ch.options.map((o, i) => {
+            const state = quizChoice === i ? (i === ch.correct ? 'right' : 'wrong') : completed && i === ch.correct ? 'right' : '';
+            return (
+              <button key={o} className={`tbtn quizopt ${state}`} disabled={!!completed} onClick={() => st.answerQuiz(i)}>
+                {String.fromCharCode(65 + i)}. {o}
+              </button>
+            );
+          })}
+          {wrong > 0 && !completed && <div className="hint warn">Not quite — {wrong} wrong {wrong === 1 ? 'try' : 'tries'} (each costs like a hint).</div>}
+        </div>
+      ) : (
+        <ul className="crit">
+          {crit.map((c, i) => (
+            <li key={i} className={c.pass ? 'ok' : ''}>
+              {c.pass ? '✔' : '○'} {c.label}
+            </li>
+          ))}
+        </ul>
+      )}
       {ch.hints.slice(0, hints).map((h, i) => (
         <div key={i} className="hintbox">
           <b>Hint {i + 1}:</b> {h}
@@ -416,12 +508,13 @@ function ChallengePanel() {
       {completed ? (
         <div className="done">
           {completed.revealed ? (
-            <span className="warn">Answer shown — no points this time.</span>
+            <span className="warn">Answer shown — no points this time{gen ? ', and the streak restarts' : ''}.</span>
           ) : (
             <span className="ok">
-              ✔ Complete! <span className="stars big">{'★'.repeat(completed.stars) + '☆'.repeat(3 - completed.stars)}</span> +{completed.points} pts
+              ✔ {ch.kind === 'quiz' ? 'Correct!' : 'Complete!'} <span className="stars big">{'★'.repeat(completed.stars) + '☆'.repeat(3 - completed.stars)}</span> +{completed.points} pts
             </span>
           )}
+          {ch.kind === 'quiz' && <div className="hint fact">💡 {ch.explanation}</div>}
           {ch.fact && <div className="hint fact">💡 {ch.fact}</div>}
           <div className="btnrow">
             {ch.kind === 'equation' && (
@@ -429,28 +522,56 @@ function ChallengePanel() {
                 ▶ Watch the atoms move
               </button>
             )}
-            {next && (
-              <button className="tbtn small primary" onClick={() => st.startChallenge(next.id)}>
-                Next: {next.title} →
+            {gen ? (
+              <button className="tbtn small primary" onClick={() => st.startPractice()}>
+                🎲 Next random ({DIFFICULTY_LABEL[practice.difficulty].toLowerCase()}) →
               </button>
+            ) : (
+              next && (
+                <button className="tbtn small primary" onClick={() => st.startChallenge(next.id)}>
+                  Next: {next.title} →
+                </button>
+              )
             )}
           </div>
         </div>
       ) : (
         <div className="btnrow">
-          <button className="tbtn small" disabled={hints >= ch.hints.length} onClick={() => st.showHint()} title="Each hint lowers the points for this challenge by 25 (H)">
-            Hint {Math.min(hints + 1, ch.hints.length)}/{ch.hints.length} (−25 pts)
+          <button className="tbtn small" disabled={hints >= ch.hints.length} onClick={() => st.showHint()} title="Each hint lowers the points for this challenge (H)">
+            Hint {Math.min(hints + 1, ch.hints.length)}/{ch.hints.length} (−{penalty} pts)
           </button>
           <button
             className="tbtn small"
             onClick={() => {
-              if (confirm('Show the answer? This challenge will then earn no points (you can replay it later).')) st.revealAnswer();
+              if (confirm('Show the answer? This challenge will then earn no points.')) st.revealAnswer();
             }}
           >
             Show answer
           </button>
+          {gen && (
+            <button className="tbtn small" onClick={() => st.startPractice()} title="Skip to another random challenge">
+              Skip
+            </button>
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function BondStrip() {
+  const pair = useStore((s) => s.doc.pair);
+  const cls = classifyBond(pair[0], pair[1]);
+  const comp = pairCompound(pair[0], pair[1]);
+  return (
+    <div className="timeline">
+      <button className="tbtn small" onClick={() => useStore.setState({ animateBond: useStore.getState().animateBond + 1 })} title="Replay (A)">
+        ▶ Replay
+      </button>
+      <span className="tl-info">
+        <b className={cls.type === 'none' ? 'replay' : 'live'}>{BOND_LABEL[cls.type].toUpperCase()}</b> {pair[0]} + {pair[1]}
+        {comp.formula ? ` → ${comp.formula}` : ''} · ΔEN {cls.dEN != null ? cls.dEN.toFixed(2) : '—'}
+      </span>
     </div>
   );
 }

@@ -5,7 +5,7 @@
  * 3D shapes are flattened. Ionic compounds are drawn as one formula unit, metals as one atom — the real
  * substances are giant lattices.
  */
-import { elementBySymbol } from './elements';
+import { COMMON_IONS, elementBySymbol } from './elements';
 import { hillKey, parseSpecies, type Species } from './formula';
 
 export interface SAtom {
@@ -101,7 +101,7 @@ function hydroxideAt(s: B, angle: number, cx: number, cy: number): number {
 }
 
 /** Straight-chain alkane CnH(2n+2) as a displayed formula. */
-function alkane(n: number): Structure {
+function alkaneGen(n: number): Structure {
   const s = new B();
   const c: number[] = [];
   for (let i = 0; i < n; i++) c.push(s.at('C', i, 0));
@@ -183,8 +183,8 @@ function build(): Record<string, Structure> {
     L['SO3'] = s.done('molecule', 'Flat triangle. Drawn with three double bonds; the real bonding is delocalised ≈.');
   }
 
-  L['C3H8'] = alkane(3);
-  L['C8H18'] = alkane(8);
+  L['C3H8'] = alkaneGen(3);
+  L['C8H18'] = alkaneGen(8);
   {
     const s = new B();
     const c1 = s.at('C', 0, 0);
@@ -290,8 +290,9 @@ export const STRUCTURES: Record<string, Structure> = build();
 const NOT_BY_COMPOSITION = new Set(['C2H5OH', 'C6H12O6', 'C3H8', 'C8H18']);
 
 let byHill: Map<string, Structure> | null = null;
+const generatedCache = new Map<string, Structure>();
 
-/** Drawing for a species: from the library, or a loose cluster of atoms if the structure is unknown. */
+/** Drawing for a species: library, then simple generators, then a loose cluster if the structure is unknown. */
 export function structureFor(sp: Species): Structure {
   const direct = STRUCTURES[sp.text];
   if (direct) return direct;
@@ -301,7 +302,116 @@ export function structureFor(sp: Species): Structure {
   }
   const viaHill = byHill.get(hillKey(sp));
   if (viaHill) return viaHill;
-  return clusterFallback(sp);
+  const cached = generatedCache.get(sp.text);
+  if (cached) return cached;
+  const g = generate(sp) ?? clusterFallback(sp);
+  generatedCache.set(sp.text, g);
+  return g;
+}
+
+/** Straight-chain alcohol CnH(2n+1)OH with the OH on the end carbon. */
+function alcohol(n: number): Structure {
+  const s = new B();
+  const c: number[] = [];
+  for (let i = 0; i < n; i++) c.push(s.at('C', i, 0));
+  for (let i = 0; i < n; i++) {
+    if (i) s.bond(c[i - 1], c[i]);
+    s.bond(c[i], s.at('H', i, -1));
+    s.bond(c[i], s.at('H', i, 1));
+  }
+  s.bond(c[0], s.at('H', -1, 0));
+  const o = s.at('O', n, 0);
+  s.bond(c[n - 1], o).bond(o, s.at('H', n + 1, 0));
+  return s.done('molecule', 'Straight-chain alcohol with the OH group on the end carbon (other isomers exist) ≈.');
+}
+
+/** Simple molecule: central atom with n identical terminal atoms (flattened). */
+function star(central: string, terminal: string, n: number, order: 1 | 2 | 3): Structure {
+  const s = new B();
+  const c = s.at(central, 0, 0);
+  const el = elementBySymbol(central)!;
+  const angles =
+    n === 1 ? [0] : n === 2 ? (el.group === 16 ? [142, 38] : [180, 0]) : n === 3 ? (el.group === 15 ? [155, 25, 90] : [-90, 30, 150]) : [0, 90, 180, 270];
+  for (const a of angles) s.bond(c, s.at(terminal, ...polar(1, a)), order);
+  return s.done('molecule', n > 2 ? 'Really a 3D shape, flattened here ≈.' : undefined);
+}
+
+function generate(sp: Species): Structure | null {
+  if (sp.isElectron) return null;
+  const els = [...sp.counts.keys()];
+  // alkanes CnH2n+2 → straight chain
+  if (sp.charge === 0 && els.length === 2 && sp.counts.has('C') && sp.counts.has('H')) {
+    const n = sp.counts.get('C')!;
+    if (sp.counts.get('H') === 2 * n + 2 && n >= 1 && n <= 12) {
+      const a = alkaneGen(n);
+      return { ...a, note: n >= 4 ? 'Straight-chain isomer drawn (branched isomers have the same formula) ≈.' : a.note };
+    }
+  }
+  const alc = /^C(\d*)H(\d+)OH$/.exec(sp.formula);
+  if (alc && sp.charge === 0) {
+    const n = alc[1] ? Number(alc[1]) : 1;
+    if (Number(alc[2]) === 2 * n + 1 && n <= 10) return alcohol(n);
+  }
+  // metal hydroxides M(OH)n / MOH
+  const hyd = /^([A-Z][a-z]?)(?:\(OH\)(\d)|OH)$/.exec(sp.formula);
+  if (hyd && sp.charge === 0) {
+    const el = elementBySymbol(hyd[1]);
+    const n = hyd[2] ? Number(hyd[2]) : 1;
+    if (el && isMetalEl(el.category)) {
+      const s = new B();
+      const m = s.at(hyd[1], 0, 0, n);
+      const angles = n === 1 ? [0] : n === 2 ? [180, 0] : n === 3 ? [-90, 30, 150] : [0, 90, 180, 270];
+      for (const a of angles) {
+        const [ox, oy] = polar(1.25, a);
+        const [hx, hy] = polar(2.15, a);
+        const o = s.at('O', ox, oy);
+        const h = s.at('H', hx, hy);
+        s.bond(o, h).group([o, h], -1).ionic(m, o);
+      }
+      return s.done('ionic', LATTICE);
+    }
+  }
+  const DIATOMIC: Record<string, 1 | 2 | 3> = { H: 1, N: 3, O: 2, F: 1, Cl: 1, Br: 1, I: 1 };
+  if (sp.charge === 0 && els.length === 1 && sp.counts.get(els[0]) === 2 && DIATOMIC[els[0]]) return diatomic(els[0], els[0], DIATOMIC[els[0]]);
+  if (els.length !== 2) return null;
+  const [a, b] = els.map((e) => elementBySymbol(e)!);
+  const ma = isMetalEl(a.category);
+  const mb = isMetalEl(b.category);
+  if (sp.charge === 0 && ma !== mb) {
+    // binary ionic compound: check the counts against common ion charges
+    const [m, x] = ma ? [a, b] : [b, a];
+    const nm = sp.counts.get(m.symbol)!;
+    const nx = sp.counts.get(x.symbol)!;
+    const qx = (COMMON_IONS[x.Z] ?? []).find((q) => q < 0);
+    if (qx == null || (nx * -qx) % nm !== 0) return null;
+    const qm = (nx * -qx) / nm;
+    if (qm < 1 || qm > 4 || nm + nx > 7) return null;
+    const ions: [string, number][] = [];
+    let i = 0;
+    let j = 0;
+    while (i < nm || j < nx) {
+      // interleave, starting with whichever ion is more numerous
+      const takeX = j < nx && (i >= nm || (nx >= nm ? (i + j) % 2 === 0 : (i + j) % 2 === 1));
+      if (takeX) (ions.push([x.symbol, qx]), j++);
+      else (ions.push([m.symbol, qm]), i++);
+    }
+    return ionRow(ions, `${LATTICE} (Charges inferred from common ions.)`);
+  }
+  if (sp.charge === 0 && !ma && !mb) {
+    // simple covalent molecule: one central atom with identical terminals
+    const [c, t] = sp.counts.get(a.symbol) === 1 ? [a, b] : sp.counts.get(b.symbol) === 1 ? [b, a] : [null, null];
+    if (!c || !t) return null;
+    const n = sp.counts.get(t.symbol)!;
+    const vt = { H: 1, F: 1, Cl: 1, Br: 1, I: 1, O: 2, S: 2 }[t.symbol];
+    const vc = { C: 4, Si: 4, N: 3, P: 3, B: 3, O: 2, S: 2, H: 1, F: 1, Cl: 1, Br: 1, I: 1 }[c.symbol];
+    if (!vt || !vc || n * vt !== vc || n > 4) return null;
+    return star(c.symbol, t.symbol, n, vt as 1 | 2);
+  }
+  return null;
+}
+
+function isMetalEl(category: string): boolean {
+  return ['alkali', 'alkaline-earth', 'transition', 'post-transition', 'lanthanide', 'actinide'].includes(category);
 }
 
 /** Atoms in a compact spiral, no bonds: honest "structure unknown" drawing. */

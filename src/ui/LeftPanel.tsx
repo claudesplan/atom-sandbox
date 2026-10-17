@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { LIMITS } from '../chem/atom';
-import { elementByZ } from '../chem/elements';
+import { elementBySymbol, elementByZ } from '../chem/elements';
 import { balance, equationToText } from '../chem/equation';
 import { DECAY_LABEL, formatHalfLife, listedIsotopes, superscript } from '../chem/nuclides';
 import { REACTIONS } from '../chem/reactions';
-import { CHALLENGES, LEVELS } from '../game/challenges';
+import { classifyBond, BOND_LABEL } from '../chem/bonding';
+import { CHALLENGES, LEVELS, type Difficulty } from '../game/challenges';
+import { DIFFICULTY_LABEL, DIFFICULTY_POINTS, type PracticeKind } from '../game/generator';
+import { practiceStats } from '../game/progress';
 import { parsedEquation, useStore, type Tool } from '../state/store';
 import { addParticle, removeParticle } from './actions';
 import { Icon } from './icons';
@@ -35,6 +38,17 @@ export function ToolStrip() {
         <div className="ts-sep" />
         <IconButton title="Clear: remove every particle" onClick={() => useStore.getState().setAtom(() => ({ protons: 0, neutrons: 0, electrons: 0 }))}>
           <Icon.clear />
+        </IconButton>
+      </div>
+    );
+  if (mode === 'bonds')
+    return (
+      <div className="toolstrip">
+        <IconButton title="Replay the bonding animation (A)" onClick={() => useStore.setState({ animateBond: useStore.getState().animateBond + 1 })}>
+          <Icon.play />
+        </IconButton>
+        <IconButton title="Swap the two elements" onClick={() => useStore.getState().commit((d) => ({ ...d, pair: [d.pair[1], d.pair[0]] }))}>
+          <Icon.swap />
         </IconButton>
       </div>
     );
@@ -81,17 +95,20 @@ export function LeftPanel() {
   const mode = useStore((s) => s.mode);
   return (
     <div className="sidebar left">
-      {mode === 'atom' ? (
+      {mode === 'atom' && (
         <>
           <ParticlesSection />
           <IsotopeList />
         </>
-      ) : (
+      )}
+      {mode === 'reaction' && (
         <>
           <EquationInput />
           <ReactionLibrary />
         </>
       )}
+      {mode === 'bonds' && <PairPicker />}
+      <PracticeSection />
       <ChallengeList />
     </div>
   );
@@ -273,6 +290,126 @@ function ChallengeList() {
           </div>
         );
       })}
+    </Section>
+  );
+}
+
+const PRESET_PAIRS: { a: string; b: string; why: string }[] = [
+  { a: 'Na', b: 'Cl', why: 'table salt' },
+  { a: 'Mg', b: 'O', why: '2+ and 2− ions' },
+  { a: 'Al', b: 'O', why: 'Al₂O₃: charges must cancel' },
+  { a: 'Ca', b: 'Cl', why: 'CaCl₂' },
+  { a: 'H', b: 'H', why: 'single bond' },
+  { a: 'O', b: 'O', why: 'double bond' },
+  { a: 'N', b: 'N', why: 'triple bond' },
+  { a: 'H', b: 'Cl', why: 'polar bond' },
+  { a: 'O', b: 'H', why: 'water' },
+  { a: 'N', b: 'H', why: 'ammonia' },
+  { a: 'C', b: 'H', why: 'methane' },
+  { a: 'C', b: 'O', why: 'carbon dioxide' },
+  { a: 'Cu', b: 'Cu', why: 'a metal' },
+  { a: 'Cu', b: 'Zn', why: 'brass (alloy)' },
+  { a: 'C', b: 'C', why: 'diamond' },
+  { a: 'Ne', b: 'Ne', why: 'noble gas' },
+];
+
+function PairPicker() {
+  const pair = useStore((s) => s.doc.pair);
+  const slot = useStore((s) => s.pickSlot);
+  return (
+    <>
+      <Section title="Two elements">
+        <div className="pairpick">
+          {[0, 1].map((k) => {
+            const el = elementBySymbol(pair[k])!;
+            return (
+              <button key={k} className={`pairslot${slot === k ? ' on' : ''}`} onClick={() => useStore.setState({ pickSlot: k as 0 | 1 })} title="Select this slot, then click an element on the periodic table">
+                <span className="pz">{k === 0 ? 'A' : 'B'}</span>
+                <span className="psym">{el.symbol}</span>
+                <span className="pname">{el.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="hint dim">Click A or B, then click an element on the periodic table below. Right-click an element to set B directly.</div>
+      </Section>
+      <Section title="Examples">
+        <div className="matlist">
+          {PRESET_PAIRS.map((p) => {
+            const t = classifyBond(p.a, p.b).type;
+            return (
+              <div
+                key={p.a + p.b}
+                className={`mat rx${pair[0] === p.a && pair[1] === p.b ? ' active' : ''}`}
+                onClick={() => {
+                  useStore.getState().commit((d) => ({ ...d, pair: [p.a, p.b] }));
+                  useStore.setState({ animateBond: useStore.getState().animateBond + 1 });
+                }}
+              >
+                <span className="mname">
+                  {p.a} + {p.b} <span className="dim">· {p.why}</span>
+                </span>
+                <span className="mmeta">{BOND_LABEL[t]}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+    </>
+  );
+}
+
+const KINDS: { value: PracticeKind; label: string }[] = [
+  { value: 'mixed', label: 'Mixed' },
+  { value: 'atom', label: 'Atoms' },
+  { value: 'equation', label: 'Equations' },
+  { value: 'quiz', label: 'Bonds' },
+];
+
+function PracticeSection() {
+  const practice = useStore((s) => s.practice);
+  const progress = useStore((s) => s.progress);
+  const st = practiceStats(progress);
+  const [code, setCode] = useState('');
+  return (
+    <Section title="Practice (random)" right={<span className="dim">streak {st.streak} · best {st.bestStreak}</span>}>
+      <div className="seg small-seg">
+        {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
+          <button key={d} className={`seg-btn${practice.difficulty === d ? ' on' : ''}`} onClick={() => useStore.getState().setPractice({ difficulty: d })} title={`${DIFFICULTY_POINTS[d]} points each`}>
+            {DIFFICULTY_LABEL[d]}
+          </button>
+        ))}
+      </div>
+      <div className="seg small-seg">
+        {KINDS.map((k) => (
+          <button key={k.value} className={`seg-btn${practice.kind === k.value ? ' on' : ''}`} onClick={() => useStore.getState().setPractice({ kind: k.value })}>
+            {k.label}
+          </button>
+        ))}
+      </div>
+      <div className="btnrow">
+        <button className="tbtn primary" onClick={() => useStore.getState().startPractice()} title="Generate a new random challenge (G)">
+          <Icon.dice /> New random challenge
+        </button>
+      </div>
+      <div className="coderow">
+        <input
+          className="textfield"
+          placeholder="Practice code, e.g. MQ-4821"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+              if (!useStore.getState().startPractice(code)) useStore.getState().notify('Practice codes look like EA-123 (Easy/Medium/Hard + Atom/eQuation/Bond + number)', 'warn');
+              else setCode('');
+            }
+          }}
+        />
+      </div>
+      <div className="hint dim">
+        Solved: {st.solved.easy} easy · {st.solved.medium} medium · {st.solved.hard} hard · {st.points} pts. Share a code so someone else gets the same challenge.
+      </div>
     </Section>
   );
 }

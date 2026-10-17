@@ -45,6 +45,27 @@ export const Icon = {
       <circle cx="12.4" cy="10.2" r="1.6" />
     </S>
   ),
+  bond: () => (
+    <S>
+      <circle cx="4.6" cy="8" r="3.3" />
+      <circle cx="11.4" cy="8" r="3.3" />
+      <circle cx="8" cy="6.6" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="9.4" r="0.8" fill="currentColor" stroke="none" />
+    </S>
+  ),
+  dice: () => (
+    <S>
+      <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
+      <circle cx="5.5" cy="5.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="10.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="8" r="0.9" fill="currentColor" stroke="none" />
+    </S>
+  ),
+  swap: () => (
+    <S>
+      <path d="M3 5.5h9.5l-2-2M13 10.5H3.5l2 2" />
+    </S>
+  ),
   balance: () => (
     <S>
       <path d="M8 2.5v11M4.5 13.5h7M3 5h10M3 5l-1.8 4h3.6zM13 5l-1.8 4h3.6z" />

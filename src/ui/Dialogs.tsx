@@ -33,7 +33,8 @@ export function Dialogs() {
 }
 
 const SHORTCUTS: [string, string][] = [
-  ['1 / 2', 'Atom builder / Reactions'],
+  ['1 / 2 / 3', 'Atom builder / Reactions / Bonds'],
+  ['G', 'New random practice challenge'],
   ['P N E', 'Add a proton / neutron / electron'],
   ['Shift + P N E', 'Remove one'],
   ['X', 'Remove tool (click a particle)'],
@@ -41,7 +42,8 @@ const SHORTCUTS: [string, string][] = [
   ['Click canvas', 'Atom builder: add a particle with the active tool'],
   ['Right-click canvas', 'Atom builder: remove one of the active kind'],
   ['Click a molecule group', 'Reactions: coefficient +1 (right-click or Shift: −1)'],
-  ['A', 'Reactions: animate the atoms rearranging'],
+  ['A', 'Reactions: animate the atoms rearranging · Bonds: replay'],
+  ['Click / right-click element', 'Bonds: set element A (or the selected slot) / set B'],
   ['B', 'Reactions: auto-balance (in a challenge: show answer)'],
   ['H', 'Show the next hint for the current challenge'],
   ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],
@@ -72,6 +74,9 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
               <li>Pick a challenge on the left. The checklist in the bottom-right turns green as you meet each goal.</li>
               <li>Each challenge is worth 100 points and 3 stars. Every hint costs 25 points and a star; showing the answer gives 0.</li>
               <li>Your best result per challenge is saved in this browser (localStorage). Reset it in Settings.</li>
+              <li>
+                <b>Practice</b> makes random challenges (atoms, equations or bond questions) at Easy, Medium or Hard. Easy is worth 50 points, Medium 100, Hard 150; hints and wrong answers cost a quarter each. Each one has a code (e.g. MQ-4821) that gives exactly the same challenge again — handy for a class.
+              </li>
             </ul>
           </div>
         </div>
@@ -95,7 +100,11 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
             <li>Ion configurations use “remove the highest-n electrons first”; this is right for main-group ions and Fe²⁺/Fe³⁺/Cu²⁺, but some heavy d/f-block ions differ (marked ≈).</li>
             <li>“Common ions” is a teaching list; O²⁻ and N³⁻, for example, only exist inside crystals or solutions.</li>
             <li>Molecules are flat “displayed formulas” with rough angles; ionic solids are drawn as one formula unit, metals as single atoms — the real substances are giant lattices.</li>
-            <li>A balanced equation says nothing about whether a reaction happens, how fast, or how much energy it gives out.</li>
+            <li>A balanced equation says nothing about whether a reaction happens or how fast. The energy estimate uses average bond enthalpies for gases (≈ a few % for simple gas reactions).</li>
+            <li>
+              <b>Bond types</b> follow the classroom rule (metal + non-metal ionic, non-metals covalent, metals metallic) with the electronegativity difference shown alongside. Real bonds lie on a continuum; the app warns where the simple rule is shaky (e.g. AlCl₃, HF).
+            </li>
+            <li>Dot-and-cross diagrams show outer shells only and no 3D shape; simple formulas use the octet rule, which many real compounds break.</li>
           </ul>
         </div>
       </div>

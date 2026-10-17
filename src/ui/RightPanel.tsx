@@ -7,11 +7,12 @@ import { DECAY_EXPLAIN, DECAY_LABEL, daughter, type DecayMode } from '../chem/nu
 import { structureFor } from '../chem/structures';
 import { parsedEquation, useStore } from '../state/store';
 import { decay } from './actions';
+import { BondPanels, ReactionBondSections } from './BondPanels';
 import { Readout, Section } from './widgets';
 
 export function RightPanel() {
   const mode = useStore((s) => s.mode);
-  return <div className="sidebar right">{mode === 'atom' ? <AtomPanels /> : <ReactionPanels />}</div>;
+  return <div className="sidebar right">{mode === 'atom' ? <AtomPanels /> : mode === 'bonds' ? <BondPanels /> : <ReactionPanels />}</div>;
 }
 
 function fmtCharge(q: number): string {
@@ -224,7 +225,8 @@ function ReactionPanels() {
           (Chemical energy changes the mass by less than a billionth — far too small to show. ≈)
         </div>
       </Section>
-      <Section title="Molar masses">
+      <ReactionBondSections eq={eq} coefs={coefs} />
+      <Section title="Molar masses" defaultOpen={false}>
         {eq.terms.map((t, i) => {
           const m = molarMass(t.species);
           return <Readout key={i} label={prettyFormula(t.species)} value={m.value.toFixed(3)} unit="g/mol" approx={m.approx} />;

@@ -1472,3 +1472,182 @@ code {
   border-left-color: #e7c76a;
   font-weight: 600;
 }
+
+/* ---------- practice, bonds and quiz ---------- */
+.small-seg {
+  display: flex;
+  margin: 3px 0;
+}
+.small-seg .seg-btn {
+  flex: 1;
+  justify-content: center;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.coderow {
+  margin: 4px 0;
+}
+.tbtn.primary {
+  color: #e6f1fc;
+}
+.diff {
+  font-size: 9.5px;
+  padding: 0 5px;
+  border-radius: 2px;
+  border: 1px solid;
+  letter-spacing: 0.04em;
+}
+.diff.easy {
+  color: var(--ok);
+}
+.diff.medium {
+  color: var(--warn);
+}
+.diff.hard {
+  color: var(--bad);
+}
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.quizopt {
+  justify-content: flex-start;
+  height: 26px;
+}
+.quizopt.right {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: rgba(76, 195, 138, 0.12);
+}
+.quizopt.wrong {
+  border-color: var(--bad);
+  color: var(--bad);
+  background: rgba(239, 91, 91, 0.1);
+}
+.quizopt:disabled {
+  opacity: 0.85;
+}
+.pairpick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+.pairslot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.pairslot.on {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.pairslot .pz {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  font: 10px var(--mono);
+  color: var(--text-dim);
+}
+.pairslot .psym {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+.pairslot .pname {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.pcell .pab {
+  position: absolute;
+  bottom: 0;
+  right: 1px;
+  font: 600 8px var(--mono);
+  color: #fff;
+  background: var(--accent);
+  padding: 0 2px;
+  border-radius: 1px;
+}
+.pcell .pab.b {
+  background: #9c7ac7;
+}
+.bondtype {
+  margin: 4px 0 6px;
+  padding: 6px 8px;
+  border: 1px solid;
+  border-left-width: 3px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.bondformula {
+  color: #e6edf3;
+  font-weight: 400;
+}
+.enscale {
+  position: relative;
+  margin: 6px 0 16px;
+}
+.enbar {
+  display: flex;
+  height: 16px;
+  border: 1px solid var(--border-2);
+  overflow: hidden;
+}
+.enbar span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #e6edf3;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.enmark {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 22px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+.enticks {
+  position: relative;
+  height: 12px;
+  font: 9px var(--mono);
+  color: var(--text-faint);
+}
+.enticks span {
+  position: absolute;
+  top: 1px;
+  transform: translateX(-50%);
+}
+.enticks span:first-child {
+  transform: none;
+}
+.enticks span:last-child {
+  transform: translateX(-100%);
+}
+.proprow {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  gap: 4px;
+  padding: 2px 0;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.04);
+}
+.bondrow {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 20px;
+}

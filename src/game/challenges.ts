@@ -26,10 +26,31 @@ export interface AtomChallenge extends Base {
 
 export interface EquationChallenge extends Base {
   kind: 'equation';
-  reactionId: string;
+  /** unbalanced equation text */
+  equation: string;
+  reactionId?: string;
 }
 
-export type Challenge = AtomChallenge | EquationChallenge;
+/** Multiple-choice question about bonding (used by the random practice generator). */
+export interface QuizChallenge extends Base {
+  kind: 'quiz';
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+  /** element pair to show in the Bonds view */
+  pair?: [string, string];
+}
+
+export type Challenge = AtomChallenge | EquationChallenge | QuizChallenge;
+
+/** Extra fields of randomly generated practice challenges. */
+export interface GeneratedInfo {
+  difficulty: Difficulty;
+  seed: number;
+}
+
+export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export const LEVELS: { n: number; name: string }[] = [
   { n: 1, name: 'Building atoms' },
@@ -75,7 +96,7 @@ function eqc(id: string, level: number, reactionId: string, hints: string[], fac
   const r = reactionById(reactionId)!;
   const parsed = parseEquation(r.equation);
   const pretty = parsed.ok ? equationToText(parsed.eq, parsed.eq.terms.map(() => 1)) : r.equation;
-  return { id, level, kind: 'equation', title: `Balance: ${r.name}`, goal: `Balance ${pretty} using the smallest whole numbers.`, reactionId, hints, fact };
+  return { id, level, kind: 'equation', title: `Balance: ${r.name}`, goal: `Balance ${pretty} using the smallest whole numbers.`, equation: r.equation, reactionId, hints, fact };
 }
 
 export const CHALLENGES: Challenge[] = [
@@ -188,12 +209,23 @@ export const CHALLENGES: Challenge[] = [
   ]),
 ];
 
+const GENERATED = new Map<string, Challenge & { generated: GeneratedInfo }>();
+
+/** Make a generated challenge findable by id. */
+export function registerGenerated(c: Challenge & { generated: GeneratedInfo }): void {
+  GENERATED.set(c.id, c);
+}
+
+export function generatedInfo(id: string | null): GeneratedInfo | null {
+  return (id && GENERATED.get(id)?.generated) || null;
+}
+
 export function challengeById(id: string | null): Challenge | null {
-  return CHALLENGES.find((c) => c.id === id) ?? null;
+  return CHALLENGES.find((c) => c.id === id) ?? (id ? GENERATED.get(id) ?? null : null);
 }
 
 export function challengeEquation(c: EquationChallenge): Equation {
-  const r = parseEquation(reactionById(c.reactionId)!.equation);
+  const r = parseEquation(c.equation);
   if (!r.ok) throw new Error(r.error);
   return r.eq;
 }
@@ -217,8 +249,9 @@ function fmtCharge(q: number): string {
   return q === 0 ? '0' : q > 0 ? `+${q}` : `−${-q}`;
 }
 
-export function criteriaFor(c: Challenge, atomState: AtomState, eq: Equation | null, coefs: number[]): Criterion[] {
+export function criteriaFor(c: Challenge, atomState: AtomState, eq: Equation | null, coefs: number[], quizChoice: number | null = null): Criterion[] {
   if (c.kind === 'atom') return c.criteria(atomState);
+  if (c.kind === 'quiz') return [{ label: quizChoice == null ? 'Choose an answer' : quizChoice === c.correct ? `Correct: ${c.options[c.correct]}` : 'Not that one — try again', pass: quizChoice === c.correct }];
   if (!eq || !sameSpecies(eq, challengeEquation(c))) return [{ label: 'The challenge equation is loaded (press “Restart challenge” if you changed it)', pass: false }];
   return equationCriteria(eq, coefs);
 }
