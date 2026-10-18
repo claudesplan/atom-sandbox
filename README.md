@@ -26,6 +26,15 @@ npm run build      # type-check + production bundle in dist/
 npm run preview    # serve the production bundle
 ```
 
+### Play online
+
+The game is published on GitHub Pages: **https://claudesplan.github.io/atom-sandbox/**
+
+To publish your latest version, run `npm run deploy`. It runs the tests, builds the app and pushes the
+build to the `gh-pages` branch. GitHub serves that branch; one-time setup is **Settings → Pages →
+Source: Deploy from a branch → `gh-pages` / `(root)`** on a public repository. The site updates a
+minute or two after each deploy.
+
 Challenge progress is saved in the browser's `localStorage` (key `atom-sandbox.progress.v1`). It stays
 on that browser and computer only. **Settings → Reset all progress** clears it. The last atom and
 equation you worked on are saved too, and restored when the page reloads.
