@@ -10,6 +10,7 @@ import { DIFFICULTY_LABEL, DIFFICULTY_POINTS } from '../game/generator';
 import { BOND_LABEL, classifyBond, pairCompound } from '../chem/bonding';
 import { parsedEquation, useStore } from '../state/store';
 import { animateReaction } from './LeftPanel';
+import { compoundInfo, NamingGuide } from './CompoundPanels';
 
 export function BottomPanel() {
   const mode = useStore((s) => s.mode);
@@ -29,6 +30,12 @@ export function BottomPanel() {
           <ChallengePanel />
         </div>
       )}
+      {mode === 'compounds' && (
+        <div className="bottom-body reaction">
+          <NamingGuide />
+          <ChallengePanel />
+        </div>
+      )}
       {mode === 'bonds' && (
         <div className="bottom-body reaction">
           <PeriodicTable />
@@ -45,6 +52,7 @@ function SummaryStrip() {
   const text = useStore((s) => s.doc.eqText);
   const coefs = useStore((s) => s.doc.coefs);
   if (mode === 'bonds') return <BondStrip />;
+  if (mode === 'compounds') return <CompoundStrip />;
   if (mode === 'atom') {
     const d = describeAtom(atom);
     return (
@@ -571,6 +579,27 @@ function BondStrip() {
       <span className="tl-info">
         <b className={cls.type === 'none' ? 'replay' : 'live'}>{BOND_LABEL[cls.type].toUpperCase()}</b> {pair[0]} + {pair[1]}
         {comp.formula ? ` → ${comp.formula}` : ''} · ΔEN {cls.dEN != null ? cls.dEN.toFixed(2) : '—'}
+      </span>
+    </div>
+  );
+}
+
+function CompoundStrip() {
+  const sel = useStore((s) => s.doc.compound);
+  const { info, error } = compoundInfo(sel);
+  return (
+    <div className="timeline">
+      <button className="tbtn small" onClick={() => useStore.setState({ animateBond: useStore.getState().animateBond + 1 })} title="Replay (A)">
+        ▶ Replay
+      </button>
+      <span className="tl-info">
+        {info ? (
+          <>
+            <b className="live">{info.pretty}</b> {info.name ?? 'no name in this app'} · {info.molarMass.toFixed(2)} g/mol
+          </>
+        ) : (
+          <span className="bad">{error}</span>
+        )}
       </span>
     </div>
   );

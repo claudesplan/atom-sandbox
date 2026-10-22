@@ -180,7 +180,7 @@ function chargeLabel(ctx: CanvasRenderingContext2D, q: number, x: number, y: num
   ctx.fillText(txt, x, y);
 }
 
-function drawStructure(ctx: CanvasRenderingContext2D, st: Structure, ox: number, oy: number, s: number, alpha = 1, bondTypes = false) {
+export function drawStructure(ctx: CanvasRenderingContext2D, st: Structure, ox: number, oy: number, s: number, alpha = 1, bondTypes = false) {
   if (st.kind === 'electron') {
     ctx.fillStyle = withAlpha(C.electron, 0.2 * alpha);
     ctx.beginPath();

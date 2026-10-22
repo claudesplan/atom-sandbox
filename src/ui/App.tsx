@@ -6,6 +6,7 @@ import { practiceStats, totals } from '../game/progress';
 import { parsedEquation, useStore, type Tool } from '../state/store';
 import { addParticle, removeParticle } from './actions';
 import { BottomPanel } from './BottomPanel';
+import { compoundFormula } from './CompoundPanels';
 import { Dialogs } from './Dialogs';
 import { animateReaction, autoBalance, LeftPanel, stepElement, ToolStrip } from './LeftPanel';
 import { RightPanel } from './RightPanel';
@@ -32,8 +33,9 @@ function useKeyboard() {
       if (k === '1') st.setMode('atom');
       else if (k === '2') st.setMode('reaction');
       else if (k === '3') st.setMode('bonds');
+      else if (k === '4') st.setMode('compounds');
       else if (k === 'g') st.startPractice();
-      else if (st.mode === 'bonds' && k === 'a') useStore.setState({ animateBond: st.animateBond + 1 });
+      else if ((st.mode === 'bonds' || st.mode === 'compounds') && k === 'a') useStore.setState({ animateBond: st.animateBond + 1 });
       else if (k === '?') useStore.setState({ dialog: 'help' });
       else if (k === 'h') st.showHint();
       else if (st.mode === 'atom' && (k === 'p' || k === 'n' || k === 'e')) {
@@ -61,13 +63,14 @@ function StatusBar() {
   const progress = useStore((s) => s.progress);
   const active = useStore((s) => s.activeChallenge);
   const pair = useStore((s) => s.doc.pair);
+  const compound = useStore((s) => s.doc.compound);
   const tot = totals(progress);
   const prac = practiceStats(progress);
   const d = describeAtom(atom);
   const p = parsedEquation(text);
   return (
     <div className="statusbar">
-      <span>mode: {mode === 'atom' ? 'atom builder' : mode === 'bonds' ? 'bonds' : 'reactions'}</span>
+      <span>mode: {mode === 'atom' ? 'atom builder' : mode === 'bonds' ? 'bonds' : mode === 'compounds' ? 'compounds' : 'reactions'}</span>
       {mode === 'atom' ? (
         <>
           <span>tool: {tool}</span>
@@ -75,6 +78,8 @@ function StatusBar() {
             {d.element ? `${d.element.symbol} Z=${d.Z} A=${d.A} q=${d.charge}` : 'no element'} · {atom.protons + atom.neutrons + atom.electrons} particles
           </span>
         </>
+      ) : mode === 'compounds' ? (
+        <span>formula {compoundFormula(compound)}</span>
       ) : mode === 'bonds' ? (
         <span>
           pair {pair[0]} + {pair[1]}

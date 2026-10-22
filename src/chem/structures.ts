@@ -183,6 +183,41 @@ function build(): Record<string, Structure> {
     L['SO3'] = s.done('molecule', 'Flat triangle. Drawn with three double bonds; the real bonding is delocalised ≈.');
   }
 
+  L['CO'] = diatomic('C', 'O', 3, 'A triple bond: one of the three shared pairs comes entirely from oxygen ≈.');
+  {
+    const s = new B();
+    const n1 = s.at('N', -1, 0);
+    const n2 = s.at('N', 0, 0);
+    s.bond(n1, n2, 2).bond(n2, s.at('O', 1, 0), 2);
+    L['N2O'] = s.done('molecule', `Linear N–N–O. ${RESONANCE}`);
+  }
+  {
+    const s = new B();
+    const su = s.at('S', 0, 0);
+    s.bond(su, s.at('O', 0, -1), 2).bond(su, s.at('O', 0, 1), 2);
+    const o1 = s.at('O', -1, 0);
+    const o2 = s.at('O', 1, 0);
+    s.bond(su, o1).bond(su, o2).bond(o1, s.at('H', -1.9, 0)).bond(o2, s.at('H', 1.9, 0));
+    L['H2SO4'] = s.done('molecule', 'Really a 3D tetrahedron around S; flattened here ≈.');
+  }
+  {
+    const s = new B();
+    const n = s.at('N', 0, 0, 1);
+    s.bond(n, s.at('O', 0, -1), 2).bond(n, s.at('O', 0.87, 0.5, -1));
+    const o = s.at('O', -0.87, 0.5);
+    s.bond(n, o).bond(o, s.at('H', -1.74, 0));
+    L['HNO3'] = s.done('molecule', `The + and − are formal charges on N and O (the molecule is neutral overall). ${RESONANCE}`);
+  }
+  {
+    const s = new B();
+    const c1 = s.at('C', 0, 0);
+    const c2 = s.at('C', 1, 0);
+    s.bond(c1, c2).bond(c1, s.at('H', -1, 0)).bond(c1, s.at('H', 0, -1)).bond(c1, s.at('H', 0, 1));
+    const o = s.at('O', 2, 0);
+    s.bond(c2, s.at('O', 1, -1), 2).bond(c2, o).bond(o, s.at('H', 3, 0));
+    L['CH3COOH'] = s.done('molecule', 'Ethanoic (acetic) acid, displayed formula ≈.');
+  }
+
   L['C3H8'] = alkaneGen(3);
   L['C8H18'] = alkaneGen(8);
   {
@@ -287,7 +322,7 @@ function build(): Record<string, Structure> {
 export const STRUCTURES: Record<string, Structure> = build();
 
 /** Library entries that may be matched by composition alone (no isomers to confuse). */
-const NOT_BY_COMPOSITION = new Set(['C2H5OH', 'C6H12O6', 'C3H8', 'C8H18']);
+const NOT_BY_COMPOSITION = new Set(['C2H5OH', 'C6H12O6', 'C3H8', 'C8H18', 'CH3COOH']);
 
 let byHill: Map<string, Structure> | null = null;
 const generatedCache = new Map<string, Structure>();

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { balance, checkBalance, parseEquation } from '../src/chem/equation';
 import { structureFor } from '../src/chem/structures';
-import { criteriaFor, type Difficulty } from '../src/game/challenges';
+import { describeCompound } from '../src/chem/compounds';
+import { CHALLENGES, criteriaFor, type Difficulty } from '../src/game/challenges';
 import { generateChallenge, parsePracticeCode, practiceCode } from '../src/game/generator';
 
 const DIFFS: Difficulty[] = ['easy', 'medium', 'hard'];
@@ -71,5 +72,39 @@ describe('practice generator', () => {
   it('mixed mode produces all kinds', () => {
     const kinds = new Set(SEEDS.map((s) => generateChallenge('medium', 'mixed', s).kind));
     expect(kinds).toEqual(new Set(['atom', 'equation', 'quiz']));
+  });
+});
+
+describe('compound questions', () => {
+  const checkQuiz = (c: { question: string; options: string[]; correct: number; compound?: string; id: string }) => {
+    expect(c.correct, `${c.id}: ${c.question}`).toBeGreaterThanOrEqual(0);
+    expect(new Set(c.options).size, c.question).toBe(c.options.length);
+    expect(c.options.length, c.question).toBeGreaterThanOrEqual(3);
+    expect(c.compound, c.id).toBeTruthy();
+    const info = describeCompound(c.compound!);
+    const answer = c.options[c.correct];
+    if (/^What is the formula/.test(c.question)) expect(answer, c.question).toBe(info.pretty);
+    if (/^What is the name/.test(c.question)) expect(answer, c.question).toBe(info.name);
+    if (/^What is the molar mass/.test(c.question)) expect(answer).toBe(`${info.molarMass.toFixed(1)} g/mol`);
+    if (/percentage/.test(c.question)) {
+      const pcts = info.percent.map((p) => `${Math.round(p.percent)} %`);
+      expect(pcts, c.question).toContain(answer);
+    }
+    // no wrong option may also be a correct formula/name for the same compound
+    c.options.forEach((o, i) => {
+      if (i !== c.correct && /^What is the name/.test(c.question)) expect(o).not.toBe(info.name);
+    });
+  };
+  it('every generated compound question has exactly one right answer', () => {
+    for (const d of DIFFS)
+      for (const s of SEEDS) {
+        const c = generateChallenge(d, 'compound', s);
+        if (c.kind !== 'quiz') throw new Error('kind');
+        checkQuiz(c);
+      }
+  });
+  it('the fixed Level 7 questions are right', () => {
+    for (const c of CHALLENGES) if (c.kind === 'quiz') checkQuiz(c);
+    expect(CHALLENGES.filter((c) => c.level === 7).length).toBe(8);
   });
 });

@@ -291,7 +291,7 @@ function drawMetallic(ctx: CanvasRenderingContext2D, w: number, h: number, metal
 
 // ---------- giant / none ----------
 
-function drawGiant(ctx: CanvasRenderingContext2D, w: number, h: number, a: string, b: string, R: number) {
+export function drawGiant(ctx: CanvasRenderingContext2D, w: number, h: number, a: string, b: string, R: number) {
   const r = R * 0.3;
   const step = R * 0.95;
   const cx = w / 2;

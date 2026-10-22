@@ -40,6 +40,8 @@ export interface QuizChallenge extends Base {
   explanation: string;
   /** element pair to show in the Bonds view */
   pair?: [string, string];
+  /** formula to show in the Compounds view (the question then belongs to that view) */
+  compound?: string;
 }
 
 export type Challenge = AtomChallenge | EquationChallenge | QuizChallenge;
@@ -59,6 +61,7 @@ export const LEVELS: { n: number; name: string }[] = [
   { n: 4, name: 'Balancing equations' },
   { n: 5, name: 'Harder balancing' },
   { n: 6, name: 'Ions and charge' },
+  { n: 7, name: 'Compounds' },
 ];
 
 // ---------- atom criteria ----------
@@ -219,6 +222,21 @@ export function registerGenerated(c: Challenge & { generated: GeneratedInfo }): 
 export function generatedInfo(id: string | null): GeneratedInfo | null {
   return (id && GENERATED.get(id)?.generated) || null;
 }
+
+function cq(id: string, title: string, question: string, options: string[], correct: number, explanation: string, compound: string, hints: string[]): QuizChallenge {
+  return { id, level: 7, kind: 'quiz', title, goal: question, question, options, correct, explanation, compound, hints };
+}
+
+CHALLENGES.push(
+  cq('cp-nacl', 'Name it: NaCl', 'What is the name of NaCl?', ['sodium chlorine', 'sodium chloride', 'sodium chlorate', 'chlorine sodide'], 1, 'Metal first (sodium), then the non-metal with its ending changed to “-ide” (chloride).', 'NaCl', ['A single non-metal ion ends in “-ide”.']),
+  cq('cp-mgo', 'Formula: magnesium oxide', 'What is the formula of magnesium oxide?', ['Mg₂O', 'MgO₂', 'MgO', 'Mg₂O₃'], 2, 'Mg²⁺ and O²⁻: one of each cancels (+2 − 2 = 0), so MgO.', 'MgO', ['Magnesium is in group 2 (Mg²⁺); oxygen forms O²⁻.']),
+  cq('cp-cacl2', 'Formula: calcium chloride', 'What is the formula of calcium chloride?', ['CaCl', 'CaCl₂', 'Ca₂Cl', 'CaCl₃'], 1, 'Ca²⁺ needs two Cl⁻ ions to cancel its charge: CaCl₂.', 'CaCl2', ['Ca²⁺ has charge +2; each Cl⁻ only −1.']),
+  cq('cp-fe2o3', 'Name it: Fe₂O₃', 'What is the name of Fe₂O₃ (rust)?', ['iron(II) oxide', 'iron(III) oxide', 'iron oxygen', 'iron(III) hydroxide'], 1, 'Three O²⁻ ions give −6, shared by two iron ions: each is Fe³⁺, so iron(III) oxide.', 'Fe2O3', ['Work out the charge on each iron ion: the oxide ions add up to −6.']),
+  cq('cp-caoh2', 'Formula: calcium hydroxide', 'What is the formula of calcium hydroxide?', ['CaOH', 'CaOH₂', 'Ca(OH)₂', 'Ca₂OH'], 2, 'Ca²⁺ needs two OH⁻ ions. OH is one ion, so it goes in brackets: Ca(OH)₂ (CaOH₂ would mean only one O).', 'Ca(OH)2', ['Hydroxide OH⁻ is a polyatomic ion — keep it together with brackets.']),
+  cq('cp-co2', 'Name it: CO₂', 'What is the name of CO₂?', ['carbon monoxide', 'carbonate', 'carbon dioxide', 'carbon(II) oxide'], 2, 'Two non-metals: use prefixes. One C, two O → carbon dioxide.', 'CO2', ['Covalent compounds use prefixes: mono-, di-, tri- …']),
+  cq('cp-al2so43', 'Formula: aluminium sulfate', 'What is the formula of aluminium sulfate?', ['AlSO₄', 'Al₃(SO₄)₂', 'Al₂(SO₄)₃', 'Al₂SO₄₃'], 2, 'Al³⁺ and SO₄²⁻: 2 × (+3) = +6 and 3 × (−2) = −6. Sulfate is one ion, so brackets: Al₂(SO₄)₃.', 'Al2(SO4)3', ['Find the smallest total charge both 3 and 2 divide into.', 'That is 6: two Al³⁺ and three SO₄²⁻.']),
+  cq('cp-pct', 'Percent: hydrogen in water', 'About what percentage of the mass of water (H₂O) is hydrogen?', ['67 %', '33 %', '11 %', '50 %'], 2, 'H₂O: 2 × 1.008 = 2.016 g/mol of hydrogen out of 18.015 g/mol, about 11 %. Two-thirds of the atoms are hydrogen, but they are very light.', 'H2O', ['Use masses, not numbers of atoms: H ≈ 1, O ≈ 16.']),
+);
 
 export function challengeById(id: string | null): Challenge | null {
   return CHALLENGES.find((c) => c.id === id) ?? (id ? GENERATED.get(id) ?? null : null);

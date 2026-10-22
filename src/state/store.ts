@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import { clampAtom, type AtomState } from '../chem/atom';
+import { anionById, cationById } from '../chem/compounds';
 import { elementBySymbol } from '../chem/elements';
 import { balance, parseEquation, type ParseResult } from '../chem/equation';
 import { challengeById, criteriaFor, generatedInfo, pointsFor, registerGenerated, starsFor, type Difficulty } from '../game/challenges';
 import { DIFFICULTY_POINTS, generateChallenge, parsePracticeCode, randomSeed, type PracticeKind } from '../game/generator';
 import { emptyProgress, isSolved, loadProgress, recordPractice, recordResult, safeStorage, saveProgress, type Progress } from '../game/progress';
 
-export type Mode = 'atom' | 'reaction' | 'bonds';
+export type Mode = 'atom' | 'reaction' | 'bonds' | 'compounds';
+
+/** Compound shown in the Compounds view: built from two ions, or any formula. */
+export type CompoundSel = { kind: 'ions'; cation: string; anion: string } | { kind: 'formula'; text: string };
 export type Tool = 'proton' | 'neutron' | 'electron' | 'remove';
 
 /** The undoable document. */
@@ -16,6 +20,7 @@ export interface Doc {
   coefs: number[];
   /** the two elements in the Bonds view */
   pair: [string, string];
+  compound: CompoundSel;
 }
 
 export interface ViewOptions {
@@ -72,6 +77,7 @@ export interface StoreState {
   setEquation: (text: string, coefs?: number[]) => void;
   setCoef: (i: number, v: number) => void;
   setPair: (slot: 0 | 1, symbol: string) => void;
+  setCompound: (c: CompoundSel) => void;
   setView: (p: Partial<ViewOptions>) => void;
   setPractice: (p: Partial<PracticeSettings>) => void;
   startChallenge: (id: string) => void;
@@ -123,9 +129,16 @@ function loadSaved(): Partial<Saved> {
   }
 }
 
-const DEFAULT_DOC: Doc = { atom: { protons: 6, neutrons: 6, electrons: 6 }, eqText: 'H2 + O2 -> H2O', coefs: [1, 1, 1], pair: ['Na', 'Cl'] };
+const DEFAULT_DOC: Doc = { atom: { protons: 6, neutrons: 6, electrons: 6 }, eqText: 'H2 + O2 -> H2O', coefs: [1, 1, 1], pair: ['Na', 'Cl'], compound: { kind: 'ions', cation: 'Al', anion: 'SO4' } };
 const DEFAULT_VIEW: ViewOptions = { labels: true, animate: true, cloud: false, formulas: true, bondTypes: false, enColours: false };
 const DEFAULT_PRACTICE: PracticeSettings = { difficulty: 'easy', kind: 'mixed' };
+
+function validCompound(c: unknown): c is CompoundSel {
+  if (!c || typeof c !== 'object') return false;
+  const x = c as Record<string, unknown>;
+  if (x.kind === 'ions') return !!cationById(String(x.cation)) && !!anionById(String(x.anion));
+  return x.kind === 'formula' && typeof x.text === 'string';
+}
 
 function validPair(p: unknown): p is [string, string] {
   return Array.isArray(p) && p.length === 2 && p.every((x) => typeof x === 'string' && elementBySymbol(x));
@@ -135,9 +148,15 @@ function initial(): { mode: Mode; doc: Doc; view: ViewOptions; practice: Practic
   const s = loadSaved();
   const doc =
     s.doc && s.doc.atom && typeof s.doc.eqText === 'string'
-      ? { ...s.doc, atom: clampAtom(s.doc.atom), coefs: coefsFor(s.doc.eqText, s.doc.coefs), pair: validPair(s.doc.pair) ? s.doc.pair : DEFAULT_DOC.pair }
+      ? {
+          ...s.doc,
+          atom: clampAtom(s.doc.atom),
+          coefs: coefsFor(s.doc.eqText, s.doc.coefs),
+          pair: validPair(s.doc.pair) ? s.doc.pair : DEFAULT_DOC.pair,
+          compound: validCompound(s.doc.compound) ? s.doc.compound : DEFAULT_DOC.compound,
+        }
       : DEFAULT_DOC;
-  const mode: Mode = s.mode === 'reaction' || s.mode === 'bonds' ? s.mode : 'atom';
+  const mode: Mode = s.mode === 'reaction' || s.mode === 'bonds' || s.mode === 'compounds' ? s.mode : 'atom';
   return { mode, doc, view: { ...DEFAULT_VIEW, ...(s.view ?? {}) }, practice: { ...DEFAULT_PRACTICE, ...(s.practice ?? {}) } };
 }
 
@@ -178,13 +197,14 @@ export const useStore = create<StoreState>((set, get) => {
     saveProgress(progress);
     set({ progress, completed: { stars, points, revealed } });
     if (ch.kind === 'quiz' && ch.pair) get().commit((d) => ({ ...d, pair: ch.pair! }));
+    if (ch.kind === 'quiz' && ch.compound) get().commit((d) => ({ ...d, compound: { kind: 'formula', text: ch.compound! } }));
     if (!revealed) get().notify(`${gen ? 'Practice' : 'Challenge'} complete${gen ? '' : `: ${ch.title}`}  ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}  +${points} points`, 'win');
   };
 
   const begin = (id: string) => {
     const ch = challengeById(id);
     if (!ch) return;
-    const mode: Mode = ch.kind === 'atom' ? 'atom' : ch.kind === 'equation' ? 'reaction' : 'bonds';
+    const mode: Mode = ch.kind === 'atom' ? 'atom' : ch.kind === 'equation' ? 'reaction' : ch.compound ? 'compounds' : 'bonds';
     set({ activeChallenge: id, hintsShown: 0, revealed: false, completed: null, quizChoice: null, wrongAnswers: 0, mode });
     if (ch.kind === 'atom') get().commit((d) => ({ ...d, atom: { protons: 0, neutrons: 0, electrons: 0 } }));
     else if (ch.kind === 'equation') {
@@ -254,6 +274,10 @@ export const useStore = create<StoreState>((set, get) => {
         pair[slot] = symbol;
         return { ...d, pair };
       });
+      set({ animateBond: get().animateBond + 1 });
+    },
+    setCompound: (compound) => {
+      get().commit((d) => ({ ...d, compound }));
       set({ animateBond: get().animateBond + 1 });
     },
     setView: (p) => set({ view: { ...get().view, ...p } }),

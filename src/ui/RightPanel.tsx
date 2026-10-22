@@ -8,11 +8,12 @@ import { structureFor } from '../chem/structures';
 import { parsedEquation, useStore } from '../state/store';
 import { decay } from './actions';
 import { BondPanels, ReactionBondSections } from './BondPanels';
+import { CompoundRight } from './CompoundPanels';
 import { Readout, Section } from './widgets';
 
 export function RightPanel() {
   const mode = useStore((s) => s.mode);
-  return <div className="sidebar right">{mode === 'atom' ? <AtomPanels /> : mode === 'bonds' ? <BondPanels /> : <ReactionPanels />}</div>;
+  return <div className="sidebar right">{mode === 'atom' ? <AtomPanels /> : mode === 'bonds' ? <BondPanels /> : mode === 'compounds' ? <CompoundRight /> : <ReactionPanels />}</div>;
 }
 
 function fmtCharge(q: number): string {

@@ -5,18 +5,19 @@
 import { chargeSymbol, describeAtom, type AtomState } from '../chem/atom';
 import { BOND_EXPLAIN, BOND_LABEL, classifyBond, pairCompound, type BondType } from '../chem/bonding';
 import { configuration, isoelectronicNobleGas, prettyConfig, shorthand } from '../chem/configuration';
+import { anionById, cationById, combineIons, describeCompound, percentComposition, type IonDef, type IonicCompound } from '../chem/compounds';
 import { COMMON_IONS, elementBySymbol, elementByZ } from '../chem/elements';
 import { balance, equationToText, parseEquation } from '../chem/equation';
-import { prettyFormula } from '../chem/formula';
+import { molarMass, parseSpecies, prettyFormula } from '../chem/formula';
 import { DECAY_LABEL, listedIsotopes, superscript, type DecayMode } from '../chem/nuclides';
 import type { AtomChallenge, Challenge, Criterion, Difficulty, EquationChallenge, GeneratedInfo, QuizChallenge } from './challenges';
 
-export type PracticeKind = 'atom' | 'equation' | 'quiz' | 'mixed';
+export type PracticeKind = 'atom' | 'equation' | 'quiz' | 'compound' | 'mixed';
 
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 export const DIFFICULTY_POINTS: Record<Difficulty, number> = { easy: 50, medium: 100, hard: 150 };
 
-const KIND_CODE: Record<Exclude<PracticeKind, 'mixed'>, string> = { atom: 'A', equation: 'Q', quiz: 'B' };
+const KIND_CODE: Record<Exclude<PracticeKind, 'mixed'>, string> = { atom: 'A', equation: 'Q', quiz: 'B', compound: 'C' };
 const DIFF_CODE: Record<Difficulty, string> = { easy: 'E', medium: 'M', hard: 'H' };
 
 export type Generated = Challenge & { generated: GeneratedInfo };
@@ -42,7 +43,7 @@ export function practiceCode(difficulty: Difficulty, kind: Exclude<PracticeKind,
 }
 
 export function parsePracticeCode(code: string): { difficulty: Difficulty; kind: Exclude<PracticeKind, 'mixed'>; seed: number } | null {
-  const m = /^([EMH])([AQB])-(\d{1,9})$/i.exec(code.trim());
+  const m = /^([EMH])([AQBC])-(\d{1,9})$/i.exec(code.trim());
   if (!m) return null;
   const difficulty = (Object.keys(DIFF_CODE) as Difficulty[]).find((d) => DIFF_CODE[d] === m[1].toUpperCase())!;
   const kind = (Object.keys(KIND_CODE) as Exclude<PracticeKind, 'mixed'>[]).find((k) => KIND_CODE[k] === m[2].toUpperCase())!;
@@ -56,10 +57,10 @@ export function randomSeed(): number {
 /** Generate a practice challenge. For 'mixed' the kind is chosen from the seed. */
 export function generateChallenge(difficulty: Difficulty, kind: PracticeKind, seed: number): Generated {
   const r = rng(seed * 7919 + difficulty.length * 31);
-  const k: Exclude<PracticeKind, 'mixed'> = kind === 'mixed' ? pick(r, ['atom', 'equation', 'quiz'] as const) : kind;
+  const k: Exclude<PracticeKind, 'mixed'> = kind === 'mixed' ? pick(r, ['atom', 'equation', 'quiz', 'compound'] as const) : kind;
   const code = practiceCode(difficulty, k, seed);
   const base = { id: `rnd-${code}`, level: 0, generated: { difficulty, seed } };
-  const c = k === 'atom' ? genAtom(r, difficulty) : k === 'equation' ? genEquation(r, difficulty) : genQuiz(r, difficulty);
+  const c = k === 'atom' ? genAtom(r, difficulty) : k === 'equation' ? genEquation(r, difficulty) : k === 'compound' ? genCompoundQuiz(r, difficulty) : genQuiz(r, difficulty);
   return { ...c, ...base, title: `${DIFFICULTY_LABEL[difficulty]} practice ${code}` } as Generated;
 }
 
@@ -393,4 +394,178 @@ function genQuiz(r: Rand, d: Difficulty): Omit<QuizChallenge, 'id' | 'level' | '
   const opts: BondType[] = ['ionic', 'polar-covalent', 'nonpolar-covalent', 'metallic'];
   const dTxt = cls.dEN != null ? ` The electronegativity difference is ${cls.dEN.toFixed(2)}.` : '';
   return quiz(`What type of bond forms between ${names}?`, opts.map((o) => BOND_LABEL[o]), opts.indexOf(cls.type), `${BOND_EXPLAIN[cls.type]}${dTxt}`, [a, b]);
+}
+
+// ---------- compound names and formulas ----------
+
+const pf = (f: string) => prettyFormula(parseSpecies(f));
+
+function partOf(ion: IonDef, n: number, brackets = true): string {
+  if (n === 1) return ion.body;
+  return ion.poly && brackets ? `(${ion.body})${n}` : `${ion.body}${n}`;
+}
+
+/** Wrong formulas students typically write. */
+function ratioKey(f: string): string {
+  const counts = [...parseSpecies(f).counts.entries()];
+  const g = counts.reduce((x, [, n]) => gcdN(x, n), 0);
+  return counts.map(([e, n]) => `${e}${n / g}`).sort().join('');
+}
+
+function gcdN(a: number, b: number): number {
+  while (b) [a, b] = [b, a % b];
+  return a;
+}
+
+function formulaDistractors(ic: IonicCompound): string[] {
+  const { cation: c, anion: a, nCation: nc, nAnion: na } = ic;
+  const key = ratioKey(ic.formula);
+  // drop "wrong" answers that are really the same ratio (e.g. Mg2O2 for MgO)
+  return [
+    partOf(c, na) + partOf(a, nc),
+    c.body + a.body,
+    partOf(c, nc) + partOf(a, na, false),
+    partOf(c, nc) + partOf(a, na + 1),
+    partOf(c, nc + 1) + partOf(a, na),
+    partOf(c, Math.abs(a.charge)) + partOf(a, c.charge),
+  ].filter((f) => ratioKey(f) !== key);
+}
+
+const NAME_SWAPS: Record<string, string[]> = {
+  chloride: ['chlorate', 'chlorite'], fluoride: ['fluorate', 'fluorine'], bromide: ['bromate', 'bromine'], iodide: ['iodate', 'iodine'],
+  oxide: ['hydroxide', 'oxygenate'], sulfide: ['sulfate', 'sulfite'], sulfate: ['sulfide', 'sulfite'], sulfite: ['sulfate', 'sulfide'],
+  nitride: ['nitrate', 'nitrite'], nitrate: ['nitrite', 'nitride'], nitrite: ['nitrate', 'nitride'], carbonate: ['carbide', 'hydrogencarbonate'],
+  hydrogencarbonate: ['carbonate', 'hydrocarbonate'], hydroxide: ['oxide', 'hydride'], phosphate: ['phosphide', 'phosphite'],
+  hypochlorite: ['chlorite', 'chloride'], permanganate: ['manganate', 'manganese oxide'],
+};
+
+/** Wrong names students typically give. */
+function nameDistractors(ic: IonicCompound): string[] {
+  const out: string[] = [];
+  const cn = ic.cation.name;
+  for (const sw of NAME_SWAPS[ic.anion.name] ?? []) out.push(`${cn} ${sw}`);
+  const roman = /\((I{1,3})\)/.exec(cn);
+  if (roman) for (const r of ['I', 'II', 'III', 'IV'].filter((x) => x !== roman[1])) out.push(`${cn.replace(roman[0], `(${r})`)} ${ic.anion.name}`);
+  if (!ic.anion.poly) out.push(`${cn.replace(/\(.*\)/, '')} ${elementBySymbol(ic.anion.body)!.name.toLowerCase()}`);
+  if (!roman && ['Fe', 'Cu', 'Pb'].includes(ic.cation.body) === false) out.push(`${cn}(${['I', 'II', 'III'][ic.cation.charge % 3]}) ${ic.anion.name}`);
+  return out;
+}
+
+function options(r: Rand, correct: string, wrong: string[], n = 4): { opts: string[]; idx: number } {
+  const pool = [...new Set(wrong.filter((w) => w !== correct))];
+  const chosen = shuffle(r, pool).slice(0, n - 1);
+  const opts = shuffle(r, [correct, ...chosen]);
+  return { opts, idx: opts.indexOf(correct) };
+}
+
+const FIXED_CATIONS = ['Li', 'Na', 'K', 'Mg', 'Ca', 'Ba', 'Al', 'Zn', 'Ag'];
+const VARIABLE_CATIONS = ['Fe2', 'Fe3', 'Cu1', 'Cu2', 'Pb2'];
+const MONATOMIC = ['F', 'Cl', 'Br', 'I', 'O', 'S', 'N'];
+const POLY = ['OH', 'NO3', 'CO3', 'SO4', 'PO4', 'HCO3'];
+const COVALENT = ['CO', 'CO2', 'SO2', 'SO3', 'NO', 'NO2', 'N2O', 'N2O4', 'PCl3', 'PCl5', 'CCl4', 'SF6', 'SiCl4', 'CS2', 'P4O10'];
+
+function compoundQuiz(question: string, opts: string[], correct: number, explanation: string, formula: string, hint: string): Omit<QuizChallenge, 'id' | 'level' | 'title'> {
+  return { kind: 'quiz', goal: question, question, options: opts, correct, explanation, compound: formula, hints: [hint] };
+}
+
+function pickIonic(r: Rand, cations: string[], anions: string[], needBrackets = false): IonicCompound {
+  for (let i = 0; i < 60; i++) {
+    const ic = combineIons(cationById(pick(r, cations))!, anionById(pick(r, anions))!);
+    if (ic.warning) continue;
+    const brackets = ic.formula.includes('(');
+    if (needBrackets !== brackets) continue;
+    return ic;
+  }
+  return combineIons(cationById('Ca')!, anionById(needBrackets ? 'OH' : 'Cl')!);
+}
+
+function ionicNameOrFormula(r: Rand, ic: IonicCompound): Omit<QuizChallenge, 'id' | 'level' | 'title'> {
+  const info = describeCompound(ic.formula);
+  const why = `${ic.cation.name[0].toUpperCase() + ic.cation.name.slice(1)} ions are ${pf(`${ic.cation.body}^${ic.cation.charge === 1 ? '' : ic.cation.charge}+`)} and ${ic.anion.name} ions are ${pf(`${ic.anion.body}^${-ic.anion.charge === 1 ? '' : -ic.anion.charge}-`)}. ${ic.nCation} × (+${ic.cation.charge}) + ${ic.nAnion} × (${ic.anion.charge}) = 0, so the formula is ${pf(ic.formula)}.`;
+  if (r() < 0.5) {
+    const { opts, idx } = options(r, pf(ic.formula), formulaDistractors(ic).map(pf));
+    return compoundQuiz(`What is the formula of ${ic.name}?`, opts, idx, why, ic.formula, `The charges must cancel. ${ic.cation.name} has charge +${ic.cation.charge}; ${ic.anion.name} has charge ${ic.anion.charge}.`);
+  }
+  const { opts, idx } = options(r, ic.name, nameDistractors(ic));
+  return compoundQuiz(`What is the name of ${pf(ic.formula)}?`, opts, idx, `${info.rule ?? ''} ${why}`.trim(), ic.formula, info.rule ?? 'Name the positive ion first, then the negative ion.');
+}
+
+function covalentQuiz(r: Rand): Omit<QuizChallenge, 'id' | 'level' | 'title'> {
+  const f = pick(r, COVALENT);
+  const sp = parseSpecies(f);
+  const name = describeCompound(f).name!;
+  const [a, b] = [...sp.counts.keys()];
+  const na = sp.counts.get(a)!;
+  const nb = sp.counts.get(b)!;
+  const alt = (x: number, y: number) => {
+    try {
+      return describeCompound(`${a}${x === 1 ? '' : x}${b}${y === 1 ? '' : y}`).name;
+    } catch {
+      return null;
+    }
+  };
+  const wrong = [alt(na, nb + 1), alt(na + 1, nb), alt(nb, na), nb > 1 ? alt(na, nb - 1) : alt(na + 1, nb + 1)].filter((x): x is string => !!x);
+  if (r() < 0.5) {
+    const { opts, idx } = options(r, name, wrong);
+    return compoundQuiz(`What is the name of ${pf(f)}?`, opts, idx, `Two non-metals: prefixes give the number of each atom (mono 1, di 2, tri 3, tetra 4, penta 5, hexa 6, deca 10), and the second element ends in “-ide”. ${pf(f)} is ${name}.`, f, 'Count the atoms of each element and use the prefixes mono-, di-, tri-, tetra-, penta-, hexa-.');
+  }
+  const wrongF = [`${a}${nb === 1 ? '' : nb}${b}${na === 1 ? '' : na}`, `${a}${na === 1 ? '' : na}${b}${nb + 1}`, `${a}${na + 1}${b}${nb === 1 ? '' : nb}`, `${a}${b}`].filter((x) => x !== f).map(pf);
+  const { opts, idx } = options(r, pf(f), wrongF);
+  return compoundQuiz(`What is the formula of ${name}?`, opts, idx, `The prefixes give the numbers directly: ${name} → ${pf(f)}.`, f, 'Each prefix is a number: mono 1, di 2, tri 3, tetra 4, penta 5, hexa 6, deca 10.');
+}
+
+function percentQuiz(r: Rand, formula: string): Omit<QuizChallenge, 'id' | 'level' | 'title'> {
+  const sp = parseSpecies(formula);
+  const rows = percentComposition(sp);
+  const row = pick(r, rows);
+  const correct = Math.round(row.percent);
+  const atomsTotal = rows.reduce((t, x) => t + x.atoms, 0);
+  const byAtoms = Math.round((100 * row.atoms) / atomsTotal);
+  const wrong = [byAtoms, 100 - correct, correct + 9, correct - 9, correct + 17].filter((x) => x > 0 && x < 100 && x !== correct).map((x) => `${x} %`);
+  const { opts, idx } = options(r, `${correct} %`, wrong);
+  const el = elementBySymbol(row.symbol)!.name.toLowerCase();
+  const mm = molarMass(sp).value;
+  return compoundQuiz(
+    `About what percentage of the mass of ${pf(formula)} is ${el}?`,
+    opts,
+    idx,
+    `${row.atoms} × ${(row.mass / row.atoms).toFixed(1)} = ${row.mass.toFixed(1)} g/mol of ${el}, out of a molar mass of ${mm.toFixed(1)} g/mol: ${row.percent.toFixed(1)} %. (Counting atoms instead of mass would give ${byAtoms} % — a common mistake.)`,
+    formula,
+    'Percent by mass = (number of atoms × atomic weight) ÷ molar mass × 100. Use masses, not numbers of atoms.',
+  );
+}
+
+function massQuiz(r: Rand, formula: string): Omit<QuizChallenge, 'id' | 'level' | 'title'> {
+  const sp = parseSpecies(formula);
+  const mm = molarMass(sp).value;
+  const once = [...sp.counts.keys()].reduce((t, s) => t + elementBySymbol(s)!.weight, 0);
+  let noBrackets = mm;
+  const m = /^(.*)\(([^)]+)\)(\d+)(.*)$/.exec(formula);
+  if (m) {
+    try {
+      noBrackets = molarMass(parseSpecies(`${m[1]}${m[2]}${m[3]}${m[4]}`)).value;
+    } catch {
+      /* ignore */
+    }
+  }
+  const fmt = (x: number) => `${x.toFixed(1)} g/mol`;
+  const wrong = [once, noBrackets, mm + 16, mm - 12].filter((x) => x > 0 && Math.abs(x - mm) > 0.5).map(fmt);
+  const { opts, idx } = options(r, fmt(mm), wrong);
+  const terms = [...sp.counts.entries()].map(([s, n]) => `${n} × ${elementBySymbol(s)!.weight}`).join(' + ');
+  return compoundQuiz(`What is the molar mass of ${pf(formula)}?`, opts, idx, `${terms} = ${mm.toFixed(1)} g/mol. Every atom counts — including those multiplied by the number after a bracket.`, formula, 'Add up the atomic weights of every atom. A number after a bracket multiplies everything inside it.');
+}
+
+function genCompoundQuiz(r: Rand, d: Difficulty): Omit<QuizChallenge, 'id' | 'level' | 'title'> {
+  if (d === 'easy') return ionicNameOrFormula(r, pickIonic(r, FIXED_CATIONS, MONATOMIC));
+  if (d === 'medium') {
+    const t = pick(r, ['variable', 'poly', 'covalent', 'mass'] as const);
+    if (t === 'variable') return ionicNameOrFormula(r, pickIonic(r, VARIABLE_CATIONS, MONATOMIC));
+    if (t === 'poly') return ionicNameOrFormula(r, pickIonic(r, [...FIXED_CATIONS, 'NH4'], POLY));
+    if (t === 'covalent') return covalentQuiz(r);
+    return massQuiz(r, pickIonic(r, FIXED_CATIONS, MONATOMIC).formula);
+  }
+  const t = pick(r, ['brackets', 'brackets', 'percent', 'mass'] as const);
+  if (t === 'brackets') return ionicNameOrFormula(r, pickIonic(r, [...FIXED_CATIONS, ...VARIABLE_CATIONS, 'NH4'], POLY, true));
+  const f = pickIonic(r, [...FIXED_CATIONS, 'NH4'], [...POLY, ...MONATOMIC], t === 'mass').formula;
+  return t === 'percent' ? percentQuiz(r, f) : massQuiz(r, f);
 }

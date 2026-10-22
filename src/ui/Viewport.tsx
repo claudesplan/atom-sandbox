@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { describeAtom } from '../chem/atom';
 import { drawAtomScene, hitAtom, type ParticleKind } from '../render/atomScene';
 import { drawBondScene } from '../render/bondScene';
+import { drawCompoundScene } from '../render/compoundScene';
+import { compoundInfo } from './CompoundPanels';
 import { drawReactionScene, hitReaction, MAX_DRAWN, type ReactionAnim, type ReactionLayout } from '../render/reactionScene';
 import { parsedEquation, useStore } from '../state/store';
 import { addParticle, removeParticle, viewportInfo } from './actions';
@@ -44,7 +46,15 @@ export function Viewport() {
     const frame = (now: number) => {
       const st = useStore.getState();
       const t = (now - t0) / 1000;
-      if (st.mode === 'bonds') {
+      if (st.mode === 'compounds') {
+        if (st.animateBond !== lastBondToken) {
+          lastBondToken = st.animateBond;
+          bondStart = now;
+        }
+        const ci = compoundInfo(st.doc.compound);
+        drawCompoundScene(ctx, w, h, (now - bondStart) / 1000, ci.info, ci.error, st.view);
+        canvas.style.cursor = 'default';
+      } else if (st.mode === 'bonds') {
         if (st.animateBond !== lastBondToken) {
           lastBondToken = st.animateBond;
           bondStart = now;
@@ -83,7 +93,7 @@ export function Viewport() {
       const st = useStore.getState();
       const p = pos(e);
       const minus = e.button === 2 || e.shiftKey;
-      if (st.mode === 'bonds') return;
+      if (st.mode === 'bonds' || st.mode === 'compounds') return;
       if (st.mode === 'atom') {
         if (st.tool === 'remove' || minus) {
           const hit = viewportInfo.layout ? hitAtom(viewportInfo.layout, p.x, p.y) : null;

@@ -2,8 +2,8 @@
 
 A chemistry teaching game in the same engineering-style interface as the Physics Sandbox. You can build
 atoms from protons, neutrons and electrons, and explore isotopes, ions and radioactive decay. You can
-balance chemical equations with the molecules drawn atom by atom, and see how ionic, covalent and
-metallic bonds form. Random practice challenges come at three difficulty levels. TypeScript + React +
+balance chemical equations with the molecules drawn atom by atom, see how ionic, covalent and
+metallic bonds form, and learn to name compounds and write their formulas. Random practice challenges come at three difficulty levels. TypeScript + React +
 Vite, no backend.
 
 > **Honest about its models.** Counting is exact: the element comes from the proton count, charge is
@@ -54,7 +54,7 @@ equation you worked on are saved too, and restored when the page reloads.
 
 | Input | Action |
 | --- | --- |
-| `1` / `2` / `3` | Atom builder / Reactions / Bonds |
+| `1` / `2` / `3` / `4` | Atom builder / Reactions / Bonds / Compounds |
 | `G` | New random practice challenge |
 | `P` `N` `E` | Add a proton / neutron / electron (`Shift`: remove one) |
 | `X` | Remove tool (click a particle on the canvas) |
@@ -75,15 +75,15 @@ electrons (`e-`). Put spaces around the `+` between ions: `Na+ + Cl-`.
 
 ### Levels
 
-36 challenges in 6 levels: building atoms, isotopes, ions, balancing, harder balancing, and ions and
-charge. A checklist turns green as each goal is met. Each challenge is worth 100 points and 3 stars,
+44 challenges in 7 levels: building atoms, isotopes, ions, balancing, harder balancing, ions and
+charge, and compounds (names, formulas, % composition). A checklist turns green as each goal is met. Each challenge is worth 100 points and 3 stars,
 and every hint costs 25 points and a star. Showing the answer completes it with 0 points, and you can
 replay it later for stars. The best result per challenge is kept.
 
 ### Random practice
 
 The **Practice** section, in every mode, generates new challenges from a difficulty (Easy / Medium /
-Hard) and a type (Mixed, Atoms, Equations or Bonds):
+Hard) and a type (Mixed, Atoms, Equations, Bonds or Names):
 
 | | Atoms | Equations | Bonds quiz |
 | --- | --- | --- | --- |
@@ -91,11 +91,28 @@ Hard) and a type (Mixed, Atoms, Equations or Bonds):
 | Medium | Isotopes, common ions, "the element in period P, group G" | Small alkanes and alcohols burning, metals + acid or water (coefficients ≤ 9) | Ionic / polar / non-polar / metallic; formulas of ionic compounds |
 | Hard | Atom from its configuration, ions with a noble-gas arrangement, isotopes with a given decay mode, transition-metal ions | Larger alkanes and alcohols, precipitation with ions, metal displacement (redox, charges must balance) | Which atom is δ−, number of shared pairs, ionic formulas |
 
+**Names** (compound naming) questions: Easy covers simple ionic compounds (NaCl, MgO, Al₂O₃) from name to
+formula and back. Medium adds Roman numerals (iron(III) oxide), single polyatomic ions (KNO₃, CaCO₃),
+covalent prefixes (dinitrogen tetroxide) and molar masses. Hard covers brackets (Ca(OH)₂, Al₂(SO₄)₃,
+(NH₄)₂SO₄), percent composition and molar mass with brackets. The wrong options are typical mistakes:
+swapped numbers, missing brackets, -ide vs -ate, wrong Roman numeral, or counting atoms instead of mass.
+
 Easy is worth 50 points, Medium 100 and Hard 150, minus a quarter for each hint or wrong answer. The
 app tracks a streak, which showing the answer resets. Every practice challenge has a code (e.g.
 `MQ-4821`); typing it in the Practice box recreates exactly the same challenge, so a teacher can give a
 whole class the same one. Tests generate 450 challenges of each type and check that every one can be
 solved, needs real work, and (for equations) can be drawn.
+
+### Compounds
+
+* **Build from ions:** pick a positive ion (including NH₄⁺ and metals with Roman numerals) and a negative
+  ion (including OH⁻, NO₃⁻, CO₃²⁻, SO₄²⁻, PO₄³⁻). **Charge tiles**, one tile per ion, as wide as its
+  charge, show when the positive and negative rows match. The app gives the formula with brackets where
+  needed, and the name. Pairs that balance on paper but don't exist (e.g. aluminium carbonate) are flagged.
+* **Everyday compounds:** a library of 34 compounds (salt, baking soda, vinegar, rust, sand, bleach,
+  fertilisers, acids…) with uses, drawings for the molecules, molar mass and % composition by mass.
+* **Look up a formula:** type any formula. It is named from the library, as an ionic compound, as a
+  covalent compound with prefixes, or as an acid, and the panel explains how the name is built.
 
 ### Bonds
 
@@ -174,13 +191,14 @@ src/
     equation.ts       Equation parser, atom/charge tallies, exact rational balancer
     reactions.ts      Reaction library (unbalanced, with known answers)
     structures.ts     2D molecule drawings, generators (alkanes, alcohols, salts, hydroxides, simple molecules) + honest fallback
+    compounds.ts      Ions, formulas from charges, systematic names, everyday-compound library, % composition
     bonding.ts        Electronegativity, bond classification, pair compounds, bond enthalpies, ΔH estimate
   game/        challenges.ts (levels, goals, hints, scoring), generator.ts (seeded random practice),
                progress.ts (localStorage, incl. practice stats)
   state/       store.ts (zustand: document, undo/redo, challenge tracking, autosave)
-  render/      atomScene.ts, reactionScene.ts, bondScene.ts (Canvas 2D), colors.ts
-  ui/          React components: Toolbar, LeftPanel, RightPanel, BondPanels, Viewport, BottomPanel, Dialogs
-tests/         atoms.test.ts, equations.test.ts, bonding.test.ts, generator.test.ts
+  render/      atomScene.ts, reactionScene.ts, bondScene.ts, compoundScene.ts (Canvas 2D), colors.ts
+  ui/          React components: Toolbar, LeftPanel, RightPanel, BondPanels, CompoundPanels, Viewport, BottomPanel, Dialogs
+tests/         atoms.test.ts, equations.test.ts, bonding.test.ts, compounds.test.ts, generator.test.ts
 ```
 
 The visual style (`styles.css`, `ui/widgets.tsx`) is taken from the Physics Sandbox so the two apps look

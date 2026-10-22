@@ -53,6 +53,13 @@ export const Icon = {
       <circle cx="8" cy="9.4" r="0.8" fill="currentColor" stroke="none" />
     </S>
   ),
+  compound: () => (
+    <S>
+      <rect x="1.8" y="4" width="5.4" height="3.6" rx="1" />
+      <rect x="8.8" y="4" width="5.4" height="3.6" rx="1" />
+      <rect x="4.2" y="9.2" width="7.6" height="3.6" rx="1" />
+    </S>
+  ),
   dice: () => (
     <S>
       <rect x="2.5" y="2.5" width="11" height="11" rx="2" />

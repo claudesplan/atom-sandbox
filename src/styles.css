@@ -1651,3 +1651,69 @@ code {
   align-items: center;
   min-height: 20px;
 }
+
+/* ---------- compounds ---------- */
+.ionchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 3px 0 6px;
+}
+.ionchip {
+  height: 22px;
+  padding: 0 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: 11px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.ionchip.pos {
+  color: #ffb3b3;
+}
+.ionchip.neg {
+  color: #b3dcff;
+}
+.ionchip:hover {
+  border-color: var(--accent);
+}
+.ionchip.on.pos {
+  background: rgba(224, 93, 93, 0.25);
+  border-color: #e05d5d;
+  color: #fff;
+}
+.ionchip.on.neg {
+  background: rgba(79, 179, 255, 0.22);
+  border-color: #4fb3ff;
+  color: #fff;
+}
+.pctrow {
+  display: grid;
+  grid-template-columns: 62px 1fr 52px;
+  gap: 6px;
+  align-items: center;
+  min-height: 20px;
+}
+.pctbar {
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.pctbar i {
+  display: block;
+  height: 100%;
+  opacity: 0.8;
+}
+.pctrow .mono {
+  text-align: right;
+}
+.inv.rules td {
+  white-space: normal;
+  vertical-align: top;
+}
+.inv.rules .rk {
+  color: #e7c76a;
+  white-space: nowrap;
+  width: 90px;
+}
+.chkind.quiz { color: #e7c76a; font-weight: 700; }

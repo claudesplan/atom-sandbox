@@ -22,6 +22,7 @@ export function Toolbar() {
           <ModeButton m="atom" label="Atom builder" k="1" icon={<Icon.atom />} />
           <ModeButton m="reaction" label="Reactions" k="2" icon={<Icon.reaction />} />
           <ModeButton m="bonds" label="Bonds" k="3" icon={<Icon.bond />} />
+          <ModeButton m="compounds" label="Compounds" k="4" icon={<Icon.compound />} />
         </div>
       </div>
       <div className="tb-sep" />
@@ -46,6 +47,7 @@ export function Toolbar() {
             <Toggle k="bondTypes" label="Bond types" title="Colour bonds by type (non-polar / polar covalent / ionic) and show δ+ / δ− partial charges" />
           </>
         )}
+        {mode === 'compounds' && <Toggle k="bondTypes" label="Bond types" title="Colour bonds by type and show δ+ / δ− partial charges (molecules)" />}
         {mode === 'bonds' && <Toggle k="enColours" label="EN colours" title="Colour the periodic table by electronegativity (how strongly an atom pulls shared electrons)" />}
       </div>
       <div className="tb-spacer" />

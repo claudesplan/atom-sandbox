@@ -10,6 +10,7 @@ import { DIFFICULTY_LABEL, DIFFICULTY_POINTS, type PracticeKind } from '../game/
 import { practiceStats } from '../game/progress';
 import { parsedEquation, useStore, type Tool } from '../state/store';
 import { addParticle, removeParticle } from './actions';
+import { CompoundLeft } from './CompoundPanels';
 import { Icon } from './icons';
 import { IconButton, NumberField, Section } from './widgets';
 
@@ -41,7 +42,7 @@ export function ToolStrip() {
         </IconButton>
       </div>
     );
-  if (mode === 'bonds')
+  if (mode === 'bonds' || mode === 'compounds')
     return (
       <div className="toolstrip">
         <IconButton title="Replay the bonding animation (A)" onClick={() => useStore.setState({ animateBond: useStore.getState().animateBond + 1 })}>
@@ -108,6 +109,7 @@ export function LeftPanel() {
         </>
       )}
       {mode === 'bonds' && <PairPicker />}
+      {mode === 'compounds' && <CompoundLeft />}
       <PracticeSection />
       <ChallengeList />
     </div>
@@ -281,7 +283,7 @@ function ChallengeList() {
               const stars = r && !r.revealed ? r.stars : 0;
               return (
                 <div key={c.id} className={`chrow${active === c.id ? ' active' : ''}`} onClick={() => useStore.getState().startChallenge(c.id)} title={c.goal}>
-                  <span className={`chkind ${c.kind}`}>{c.kind === 'atom' ? '⚛' : '⇄'}</span>
+                  <span className={`chkind ${c.kind}`}>{c.kind === 'atom' ? '⚛' : c.kind === 'quiz' ? '?' : '⇄'}</span>
                   <span className="chtitle">{c.title}</span>
                   <span className={`stars${stars ? '' : ' none'}`}>{r?.revealed ? 'shown' : '★'.repeat(stars) + '☆'.repeat(3 - stars)}</span>
                 </div>
@@ -364,6 +366,7 @@ const KINDS: { value: PracticeKind; label: string }[] = [
   { value: 'atom', label: 'Atoms' },
   { value: 'equation', label: 'Equations' },
   { value: 'quiz', label: 'Bonds' },
+  { value: 'compound', label: 'Names' },
 ];
 
 function PracticeSection() {
